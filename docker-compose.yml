@@ -1,0 +1,73 @@
+
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: notification_db
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    restart: always
+    command: >
+      sh -c "while ! nc -z db 3306; do sleep 1; done;
+             alembic upgrade head;
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=mysql+pymysql://user:password@db:3306/notification_db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+      - MYSQL_SERVER=db
+      - MYSQL_PORT=3306
+      - MYSQL_DB=notification_db
+    depends_on:
+      - db
+      - redis
+
+  worker:
+    build: ./backend
+    restart: always
+    command: >
+      sh -c "while ! nc -z db 3306; do sleep 1; done;
+             celery -A app.core.celery_app.celery_app worker --loglevel=info"
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=mysql+pymysql://user:password@db:3306/notification_db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+
+  # Frontend will be added after I create it based on folder structure
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    links:
+      - backend
+
+volumes:
+  db_data:

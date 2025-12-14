@@ -1,0 +1,15 @@
+__pycache__
+.pytest_cache
+.git
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
