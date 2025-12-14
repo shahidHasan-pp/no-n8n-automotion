@@ -1,7 +1,16 @@
 
-from sqlalchemy import Column, BigInteger, Integer, ForeignKey
+from sqlalchemy import Column, BigInteger, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from .base_model import BaseModel
+
+class UserSubscribed(BaseModel):
+    __tablename__ = "user_subscribed"
+
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    subs_id = Column(BigInteger, ForeignKey("subscriptions.id"), nullable=False)
+    
+    start_date = Column(DateTime(timezone=True), nullable=True)  # When subscription starts
+    end_date = Column(DateTime(timezone=True), nullable=True)    # When subscription expires
 
 class Quiz(BaseModel):
     __tablename__ = "quizzes"

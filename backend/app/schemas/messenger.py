@@ -23,8 +23,8 @@ class Messenger(MessengerBase, BaseSchema):
 
 # Message Log Schemas
 class MessageBase(BaseModel):
-    sender: str
-    receiver: str
+    # sender: str  <-- removed
+    # receiver: str <-- removed
     text: str
     link: Optional[str] = None
     messenger_type: MessengerType

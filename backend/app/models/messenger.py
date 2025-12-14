@@ -21,8 +21,9 @@ class Messenger(BaseModel):
 class Message(BaseModel):
     __tablename__ = "messages"
 
-    sender = Column(String(255), nullable=False) # e.g. "System" or specific sender ID
-    receiver = Column(String(255), nullable=False) # e.g. user email or phone
+    # sender and receiver removed as per requirement
+    # sender = Column(String(255), nullable=False)
+    # receiver = Column(String(255), nullable=False)
     text = Column(Text, nullable=False)
     link = Column(String(512), nullable=True)
     time = Column(DateTime(timezone=True), server_default=func.now())

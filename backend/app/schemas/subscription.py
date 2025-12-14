@@ -13,6 +13,8 @@ class SubscriptionBase(BaseModel):
     offer: Optional[str] = None
     prize: Optional[str] = None
     remark: List[Any] = []
+    amount: Optional[int] = None
+    link: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
 
@@ -23,4 +25,4 @@ class SubscriptionUpdate(SubscriptionBase):
     pass
 
 class Subscription(SubscriptionBase, BaseSchema):
-    pass
+    current_subs_quantity: int = 0

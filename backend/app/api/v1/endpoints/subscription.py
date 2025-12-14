@@ -22,3 +22,10 @@ def read_subscription(sub_id: int, db: Session = Depends(deps.get_db)) -> Any:
 @router.get("/", response_model=List[Subscription])
 def read_subscriptions(db: Session = Depends(deps.get_db), skip: int = 0, limit: int = 100) -> Any:
     return subscription_crud.get_multi(db, skip=skip, limit=limit)
+
+@router.put("/{sub_id}", response_model=Subscription)
+def update_subscription(sub_id: int, sub_in: SubscriptionUpdate, db: Session = Depends(deps.get_db)) -> Any:
+    sub = subscription_crud.get(db, id=sub_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    return subscription_crud.update(db, db_obj=sub, obj_in=sub_in)

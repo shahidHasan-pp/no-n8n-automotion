@@ -26,3 +26,7 @@ class User(UserBase, BaseSchema):
     subscription_id: Optional[int] = None
     messenger: Optional[Messenger] = None
     subscription: Optional[Subscription] = None
+    active_subscriptions_count: int = 0  # Count of active subscriptions from user_subscribed table
+    
+    class Config:
+        from_attributes = True

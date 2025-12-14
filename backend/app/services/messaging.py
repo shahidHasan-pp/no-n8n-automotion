@@ -47,19 +47,18 @@ class MessagingService:
             MessengerType.DISCORD: DiscordStrategy(),
         }
 
-    def send_message(self, db: Session, messenger_type: MessengerType, sender: str, receiver: str, text: str, link: str = None, user_id: int = None) -> bool:
+    # Correct implementation:
+    def send_message(self, db: Session, messenger_type: MessengerType, to: str, text: str, link: str = None, user_id: int = None) -> bool:
         strategy = self._strategies.get(messenger_type)
         if not strategy:
             logger.error(f"No strategy found for {messenger_type}")
             return False
             
-        success = strategy.send(receiver, text, link)
+        success = strategy.send(to, text, link)
         
         # Log to DB
         try:
             msg_data = MessageCreate(
-                sender=sender,
-                receiver=receiver,
                 text=text,
                 link=link,
                 messenger_type=messenger_type,
@@ -126,7 +125,7 @@ class MessagingService:
             
         message_text = f"You are doing great! You have {current_score} points. You need {WINNING_THRESHOLD - current_score} more to win!"
         
-        sent = self.send_message(db, messenger_type, "System", receiver, message_text, user_id=user.id)
+        sent = self.send_message(db, messenger_type, receiver, message_text, user_id=user.id)
         
         if sent:
              return {"status": "success", "message": "Notification sent"}

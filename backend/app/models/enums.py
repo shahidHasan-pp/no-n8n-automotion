@@ -6,16 +6,14 @@ class QuizType(str, enum.Enum):
     TOURNAMENT = "tournament"
 
 class SubscriptionType(str, enum.Enum):
-    DAILY = "daily"
-    WEEKLY = "weekly"
-    MONTHLY = "monthly"
+    STANDARD = "STANDARD"
+    PREMIUM = "PREMIUM"
+    LOGIC = "LOGIC"
 
 class SubscriptionLength(str, enum.Enum):
-    MIN_1 = "1min"
-    MIN_3 = "3min"
-    MIN_5 = "5min"
-    MIN_10 = "10min"
-    MIN_30 = "30min"
+    MONTHLY = "MONTHLY"
+    YEARLY = "YEARLY"
+    LIFETIME = "LIFETIME"
 
 class MessengerType(str, enum.Enum):
     MAIL = "mail"

@@ -13,6 +13,10 @@ class Subscription(BaseModel):
     offer = Column(String(255), nullable=True)
     prize = Column(String(255), nullable=True)
     remark = Column(JSON, nullable=True, default=[])
+    current_subs_quantity = Column(Integer, default=0)
+    
+    amount = Column(Integer, nullable=True)  # Price/amount
+    link = Column(String(512), nullable=True)  # Payment/registration link
     
     start_date = Column(DateTime(timezone=True), nullable=True)
     end_date = Column(DateTime(timezone=True), nullable=True)
