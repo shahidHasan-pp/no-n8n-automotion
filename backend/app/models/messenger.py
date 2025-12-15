@@ -9,10 +9,10 @@ class Messenger(BaseModel):
     __tablename__ = "messengers"
 
     # Store info for services
-    mail = Column(JSON, nullable=True, default=[])
-    telegram = Column(JSON, nullable=True, default=[])
-    whatsapp = Column(JSON, nullable=True, default=[])
-    discord = Column(JSON, nullable=True, default=[])
+    mail = Column(JSON, nullable=True, default=dict)
+    telegram = Column(JSON, nullable=True, default=dict)
+    whatsapp = Column(JSON, nullable=True, default=dict)
+    discord = Column(JSON, nullable=True, default=dict)
     
     # Relationships
     users = relationship("User", back_populates="messenger")

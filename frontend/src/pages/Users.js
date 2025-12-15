@@ -124,9 +124,27 @@ function Users() {
             const res = await fetch(`${apiBase}/messengers/${user.messenger_id}`);
             if (res.ok) {
                 const data = await res.json();
-                alert(`Context for ${user.username}:\nMail: ${data.mail}\nWhatsapp: ${data.whatsapp}\nTelegram: ${data.telegram}\nDiscord: ${data.discord}`);
+
+                // Format the messenger data nicely
+                const formatData = (obj) => {
+                    if (!obj || Object.keys(obj).length === 0) return 'Not configured';
+                    return JSON.stringify(obj, null, 2);
+                };
+
+                const message = `Context for ${user.username}:\n\n` +
+                    `📧 Mail:\n${formatData(data.mail)}\n\n` +
+                    `📱 WhatsApp:\n${formatData(data.whatsapp)}\n\n` +
+                    `💬 Telegram:\n${formatData(data.telegram)}\n\n` +
+                    `🎮 Discord:\n${formatData(data.discord)}`;
+
+                alert(message);
+            } else {
+                alert("Failed to fetch messenger profile");
             }
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+            alert("Error fetching messenger profile");
+        }
     };
 
     return (

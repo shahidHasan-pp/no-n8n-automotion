@@ -1,5 +1,5 @@
 
-from typing import Optional
+from typing import Optional, Any, Dict
 from datetime import datetime
 from pydantic import BaseModel
 from app.models.enums import MessengerType
@@ -7,10 +7,10 @@ from .base import BaseSchema
 
 # Messenger Info Schemas
 class MessengerBase(BaseModel):
-    mail: Optional[str] = None
-    telegram: Optional[str] = None
-    whatsapp: Optional[str] = None
-    discord: Optional[str] = None
+    mail: Optional[Dict[str, Any]] = None
+    telegram: Optional[Dict[str, Any]] = None
+    whatsapp: Optional[Dict[str, Any]] = None
+    discord: Optional[Dict[str, Any]] = None
 
 class MessengerCreate(MessengerBase):
     pass

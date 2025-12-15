@@ -1,10 +1,10 @@
 
 from typing import Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import exists, func
 from app.crud.base import CRUDBase
 from app.models.user import User
-from app.models.messenger import Message
+from app.models.messenger import Message, Messenger
 from app.models.quiz import UserSubscribed
 from app.schemas.user import UserCreate, UserUpdate
 
@@ -25,7 +25,11 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         has_subscription: Optional[bool] = None,
         has_messages: Optional[bool] = None
     ) -> List[User]:
-        query = db.query(User)
+        # Eagerly load messenger and subscription relationships
+        query = db.query(User).options(
+            joinedload(User.messenger),
+            joinedload(User.subscription)
+        )
         
         if search:
             search_pattern = f"%{search}%"
