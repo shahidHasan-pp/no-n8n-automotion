@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import API_BASE_URL from '../config';
 
 function UserDetail() {
     const { userId } = useParams();
@@ -9,7 +10,7 @@ function UserDetail() {
     const [messenger, setMessenger] = useState(null);
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(true);
-    const apiBase = "http://localhost:8000/api/v1";
+    const apiBase = API_BASE_URL;
 
     useEffect(() => {
         if (userId) {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import API_BASE_URL from '../config';
 
 function Users() {
     const navigate = useNavigate();
@@ -20,7 +21,7 @@ function Users() {
     const [filterSubscription, setFilterSubscription] = useState('all'); // 'all', 'subscribed', 'unsubscribed', 'has_messages'
     const [totalUsers, setTotalUsers] = useState(0);
 
-    const apiBase = "http://localhost:8000/api/v1";
+    const apiBase = API_BASE_URL;
 
     useEffect(() => {
         fetchUsers();

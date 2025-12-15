@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import API_BASE_URL from '../config';
 
 function Messages() {
     const [messages, setMessages] = useState([]);
-    const apiBase = "http://localhost:8000/api/v1";
+    const apiBase = API_BASE_URL;
 
     useEffect(() => {
         fetchMessages();

@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
+import API_BASE_URL from '../config';
 
 function MessagingCenter() {
-    const apiBase = "http://localhost:8000/api/v1";
+    const apiBase = API_BASE_URL;
 
     // Tabs: 'compose' or 'settings'
     const [activeTab, setActiveTab] = useState('compose');
