@@ -54,3 +54,15 @@ def read_messenger_profile(id: int, db: Session = Depends(deps.get_db)) -> Any:
     if not item:
         raise HTTPException(status_code=404, detail="Messenger profile not found")
     return item
+
+@router.put("/{id}", response_model=Messenger)
+def update_messenger_profile(
+    id: int, 
+    profile_in: MessengerUpdate, 
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    item = messenger_crud.get(db, id=id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Messenger profile not found")
+    item = messenger_crud.update(db, db_obj=item, obj_in=profile_in)
+    return item

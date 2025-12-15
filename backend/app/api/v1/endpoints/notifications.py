@@ -34,7 +34,7 @@ def send_manual_notification(
          # Fallback or error if no contact info
          receiver = "unknown"
 
-    success = messaging_service.send_message(db, messenger_type, "System", receiver, text, link, user.id)
+    success = messaging_service.send_message(db, messenger_type, receiver, text, link, user_id=user.id)
     
     if success:
         return {"status": "success", "message": "Notification sent"}
@@ -53,3 +53,50 @@ def trigger_logic_check(
     # This will be implemented in the MessagingService or a new BusinessLogicService
     result = messaging_service.process_daily_check(db, user_id)
     return result
+
+@router.post("/send-bulk")
+def send_bulk_notifications(
+    messenger_type: MessengerType,
+    text: str,
+    link: str = None,
+    has_subscription: bool = None,
+    subscription_id: int = None,
+    db: Session = Depends(deps.get_db),
+    background_tasks: BackgroundTasks = None
+) -> Any:
+    """
+    Send bulk notifications filtered by subscription status or specific subscription.
+    """
+    from app.crud import user as user_crud
+    
+    # Re-use user_crud.get_with_filters but we might need to add subscription_id filtering support to it,
+    # or just query here. For simplicity, let's query here or update CRUD.
+    # To avoid changing CRUD repeatedly, let's just query efficiently here.
+    
+    from app.models.user import User
+    query = db.query(User)
+    
+    if has_subscription is not None:
+         if has_subscription:
+            query = query.filter(User.subscription_id.isnot(None))
+         else:
+            query = query.filter(User.subscription_id.is_(None))
+            
+    if subscription_id:
+        query = query.filter(User.subscription_id == subscription_id)
+        
+    users = query.all()
+    count = 0
+    
+    for user in users:
+        # Determine receiver based on type
+        receiver = user.email # Default
+        if messenger_type == MessengerType.WHATSAPP:
+             receiver = user.phone_number
+             
+        # Call service (synchronous for now, ideally queue this)
+        if receiver:
+             messaging_service.send_message(db, messenger_type, receiver, text, link, user_id=user.id)
+             count += 1
+             
+    return {"status": "success", "queued_count": count}

@@ -6,6 +6,7 @@ import UserDetail from './pages/UserDetail';
 import Subscriptions from './pages/Subscriptions';
 import Quizzes from './pages/Quizzes';
 import Messages from './pages/Messages';
+import MessagingCenter from './pages/MessagingCenterPage';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="/subscriptions" element={<Subscriptions />} />
           <Route path="/quizzes" element={<Quizzes />} />
           <Route path="/messages" element={<Messages />} />
+          <Route path="/messaging-center" element={<MessagingCenter />} />
         </Routes>
       </div>
     </Router>

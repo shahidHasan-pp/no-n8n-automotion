@@ -19,6 +19,7 @@ origins = [
     "http://localhost:3001", # Next.js development server port in docker
     "http://localhost:3002", # Next.js development server alternate port
     "http://localhost:5173", # Vite development server
+    "http://192.168.5.12:3000",
     # You can add other origins here for production or other environments
 ]
 

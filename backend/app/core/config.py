@@ -38,6 +38,16 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://redis:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://redis:6379/0"
 
+    # Messaging Service Credentials
+    GMAIL_ACCESS_TOKEN: str = ""
+    WHATSAPP_ACCESS_TOKEN: str = ""
+    WHATSAPP_PHONE_NUMBER_ID: str = ""
+    TELEGRAM_BOT_TOKEN: str = ""
+    DISCORD_BOT_TOKEN: str = ""
+    
+    # Wehooks (if needed)
+    DISCORD_WEBHOOK_URL: str = ""
+
     class Config:
         case_sensitive = True
         env_file = ".env"

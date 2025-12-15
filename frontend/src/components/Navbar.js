@@ -15,6 +15,7 @@ function Navbar() {
             <Link className={isActive('/')} to="/">Users</Link>
             <Link className={isActive('/subscriptions')} to="/subscriptions">Subscriptions</Link>
             <Link className={isActive('/quizzes')} to="/quizzes">Quiz</Link>
+            <Link className={isActive('/messaging-center')} to="/messaging-center">Messaging Center</Link>
             <Link className={isActive('/messages')} to="/messages">Message Logs</Link>
         </nav>
     );
