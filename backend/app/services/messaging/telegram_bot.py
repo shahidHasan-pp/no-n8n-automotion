@@ -89,23 +89,37 @@ class TelegramBotService:
                 message = update.get("message")
                 
                 if not message:
+                    if update_id and update_id > self.last_update_id:
+                        self.last_update_id = update_id
                     continue
                     
                 # Extract message details
                 chat_id = message.get("chat", {}).get("id")
                 user_id_telegram = message.get("from", {}).get("id")
-                text = message.get("text", "")
+                # Get the telegram username (grazier_shahid in example)
+                telegram_username_handle = message.get("from", {}).get("username", "") 
+                text = message.get("text", "").strip()
                 
                 if not chat_id or not text:
                     continue
                 
-                # Process /start command
+                # Check for linking attempt
+                # Logic: Treat text as potential username. 
+                # If it starts with /start, strip it. If just text, use it as is.
+                potential_username = text
                 if text.startswith("/start"):
-                    self._handle_start_command(db, chat_id, user_id_telegram, text)
+                    parts = text.split(maxsplit=1)
+                    if len(parts) > 1:
+                        potential_username = parts[1].strip()
+                    else:
+                        potential_username = "" # Just /start with no username
+                
+                if potential_username:
+                    self._handle_user_linking(db, chat_id, user_id_telegram, telegram_username_handle, potential_username)
                     processed_count += 1
                 
                 # Update last processed ID
-                if update_id > self.last_update_id:
+                if update_id and update_id > self.last_update_id:
                     self.last_update_id = update_id
                     
             except Exception as e:
@@ -114,77 +128,91 @@ class TelegramBotService:
         
         return processed_count
     
-    def _handle_start_command(self, db: Session, chat_id: int, telegram_user_id: int, text: str):
+    def _handle_user_linking(self, db: Session, chat_id: int, telegram_user_id: int, telegram_username_handle: str, provided_username: str):
         """
-        Handle /start <username> command
+        Handle user account linking
         
-        Flow:
-        1. Parse username from command
-        2. Validate user exists in database
-        3. Store telegram_chat_id mapping
-        4. Send confirmation/error message
+        Args:
+            chat_id: Telegram Chat ID
+            telegram_user_id: Telegram User ID 
+            telegram_username_handle: The actual telegram username (e.g. grazier_shahid)
+            provided_username: The username text sent by user to match in DB (e.g. asdf)
         """
-        parts = text.split(maxsplit=1)
-        
-        if len(parts) < 2:
-            # No username provided
+        try:
+            # Validate user exists in our DB
+            user = user_crud.get_by_username(db, username=provided_username)
+            
+            if not user:
+                logger.info(f"[Telegram Bot] Username '{provided_username}' not found in DB.")
+                return
+            
+            logger.info(f"[Telegram Bot] Found user: {user.username} (ID: {user.id})")
+            
+            # Check if already linked
+            if user.messenger:
+                current_telegram = user.messenger.telegram
+                if isinstance(current_telegram, dict):
+                    existing_chat_id = current_telegram.get("chat_id")
+                    if str(existing_chat_id) == str(chat_id):
+                        logger.info(f"[Telegram Bot] User {provided_username} already linked to chat_id {chat_id}. No action taken.")
+                        return
+
+            telegram_data = {
+                "chat_id": chat_id,
+                "user_id": telegram_user_id,
+                "username": telegram_username_handle, # Store the telegram handle (grazier_shahid)
+                "linked_at": time.time()
+            }
+            
+            # Transaction 1: Ensure Messenger Profile Exists
+            messenger_profile = None
+            if user.messenger_id:
+                messenger_profile = messenger_crud.get(db, id=user.messenger_id)
+            
+            if not messenger_profile:
+                logger.info(f"[Telegram Bot] Creating new messenger profile for User {user.id}")
+                # Create new messenger profile
+                messenger_profile = messenger_crud.create(db, obj_in={
+                    "mail": {},
+                    "telegram": {},
+                    "whatsapp": {},
+                    "discord": {}
+                })
+                # Link to user - DIRECT UPDATE
+                user.messenger_id = messenger_profile.id
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+                logger.info(f"[Telegram Bot] Linked User {user.id} to Messenger {messenger_profile.id}")
+            
+            # Transaction 2: Update Telegram Data
+            # DIRECT UPDATE to avoid CRUD issues with JSON fields
+            messenger_profile.telegram = telegram_data
+            
+            # We must flag the field as modified for SQLAlchemy to pick up JSON changes if it's mutable, 
+            # but since we are assigning a new dict, it should detect it.
+            # To be safe with some SQLAlchemy versions/types:
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(messenger_profile, "telegram")
+            
+            db.add(messenger_profile)
+            db.commit()
+            db.refresh(messenger_profile)
+            
+            logger.info(f"[Telegram Bot] Updated Messenger {messenger_profile.id} with telegram data: {telegram_data}")
+            
+            # Send success message
             self.send_message(
                 chat_id=chat_id,
-                text="❌ Invalid command format.\n\nUsage: /start <your_username>\n\nExample: /start john_doe"
+                text=f"✅ Successfully linked to account: {user.username}\n"
+                     f"You will now receive notifications here."
             )
-            return
-        
-        username = parts[1].strip()
-        
-        # Validate user exists
-        user = user_crud.get_by_username(db, username=username)
-        
-        if not user:
-            self.send_message(
-                chat_id=chat_id,
-                text=f"❌ Username '{username}' not found in our system.\n\nPlease register on our platform first or check your username spelling."
-            )
-            logger.info(f"[Telegram Bot] Failed login attempt for username: {username}")
-            return
-        
-        # Get or create messenger profile
-        if user.messenger_id:
-            messenger_profile = messenger_crud.get(db, id=user.messenger_id)
-        else:
-            # Create new messenger profile
-            messenger_profile = messenger_crud.create(db, obj_in={
-                "mail": {},
-                "telegram": {},
-                "whatsapp": {},
-                "discord": {}
-            })
-            # Link to user
-            user_crud.update(db, db_obj=user, obj_in={"messenger_id": messenger_profile.id})
-        
-        # Update telegram information
-        telegram_data = {
-            "chat_id": chat_id,
-            "user_id": telegram_user_id,
-            "username": username,
-            "linked_at": time.time()
-        }
-        
-        updated_data = {
-            "telegram": telegram_data
-        }
-        
-        messenger_crud.update(db, db_obj=messenger_profile, obj_in=updated_data)
-        
-        # Send success message
-        self.send_message(
-            chat_id=chat_id,
-            text=f"✅ Successfully linked to account: {user.username}\n\n"
-                 f"👤 Name: {user.full_name or 'N/A'}\n"
-                 f"📧 Email: {user.email}\n\n"
-                 f"You will now receive notifications via Telegram!"
-        )
-        
-        logger.info(f"[Telegram Bot] User {username} (ID: {user.id}) linked Telegram chat_id: {chat_id}")
+            
+            logger.info(f"[Telegram Bot] SUCCESS: User {provided_username} (ID: {user.id}) linked Telegram chat_id: {chat_id}")
+            
+        except Exception as e:
+            logger.error(f"[Telegram Bot] Exception in _handle_user_linking: {e}")
+            db.rollback()
     
     def send_message(self, chat_id: int, text: str, parse_mode: str = None) -> bool:
         """
