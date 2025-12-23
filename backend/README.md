@@ -59,7 +59,7 @@ sudo systemctl start redis-server
 Start the Celery worker and Celery beat processes for background tasks and scheduling:
 
 ```bash
-celery -A app.tasks.celery worker --loglevel=info &
+celery -A app.tasks.celery worker --loglevel=info -P solo
 ```
 
 ```bash
