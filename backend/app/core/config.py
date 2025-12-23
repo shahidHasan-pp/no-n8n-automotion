@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     WHATSAPP_ACCESS_TOKEN: str = ""
     WHATSAPP_PHONE_NUMBER_ID: str = ""
     TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_CHANNEL_ID: str = ""
     DISCORD_BOT_TOKEN: str = ""
     
     # Wehooks (if needed)

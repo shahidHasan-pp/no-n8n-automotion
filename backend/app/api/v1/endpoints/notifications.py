@@ -100,3 +100,45 @@ def send_bulk_notifications(
              count += 1
              
     return {"status": "success", "queued_count": count}
+
+
+@router.post("/send-channel")
+def send_channel_notification(
+    text: str,
+    messenger_type: MessengerType = MessengerType.TELEGRAM,
+    link: str = None,
+    channel_id: str = None, # Optional override
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Send a notification to a specific Channel/Group.
+    Currently defaults to TELEGRAM_CHANNEL_ID from env if valid.
+    """
+    from app.core.config import settings
+    
+    target = channel_id
+    
+    # Resolve target based on messenger type
+    if messenger_type == MessengerType.TELEGRAM:
+        if not target:
+            target = settings.TELEGRAM_CHANNEL_ID
+        
+        if not target:
+             raise HTTPException(status_code=400, detail="No Telegram Channel ID configured (check .env TELEGRAM_CHANNEL_ID)")
+             
+        # Basic formatting check
+        target = target.strip()
+            
+    elif messenger_type == MessengerType.DISCORD:
+         if not target:
+             # Placeholder for a DISCORD_CHANNEL_ID if we had one
+             target = "" 
+         if not target:
+             raise HTTPException(status_code=400, detail="Discord Channel ID not provided")
+
+    success = messaging_service.send_message(db, messenger_type, target, text, link, user_id=None)
+    
+    if success:
+        return {"status": "success", "message": f"Notification sent to {target}"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to send notification to channel")

@@ -27,6 +27,12 @@ function MessagingCenter() {
     const [bulkSubId, setBulkSubId] = useState('all_subs');
     const [bulkStatus, setBulkStatus] = useState(null);
 
+    // --- State: Send Channel ---
+    const [channelMessenger, setChannelMessenger] = useState('telegram');
+    const [channelText, setChannelText] = useState('');
+    const [channelLink, setChannelLink] = useState('');
+    const [channelStatus, setChannelStatus] = useState(null);
+
     // --- State: Shared/Data ---
     const [users, setUsers] = useState([]);
     const [subscriptions, setSubscriptions] = useState([]);
@@ -145,6 +151,30 @@ function MessagingCenter() {
         }
     };
 
+    // --- Logic: Send Channel ---
+    const handleSendChannel = async (e) => {
+        e.preventDefault();
+        setChannelStatus('sending...');
+
+        let url = `${apiBase}/notifications/send-channel?messenger_type=${channelMessenger}&text=${encodeURIComponent(channelText)}&link=${encodeURIComponent(channelLink)}`;
+        // Note: channel_id is optional now, handled by backend for Telegram. 
+        // If we wanted to support custom override, we'd add it back.
+
+        try {
+            const res = await fetch(url, {
+                method: 'POST'
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setChannelStatus(data.message);
+            } else {
+                setChannelStatus(`Error: ${data.detail || 'Failed'}`);
+            }
+        } catch (e) {
+            setChannelStatus('Network Error');
+        }
+    };
+
     // --- Logic: Settings ---
     const handleUserSelect = async (user) => {
         setSelectedUser(user);
@@ -260,6 +290,12 @@ function MessagingCenter() {
                             onClick={() => setActiveSubTab('bulk')}
                         >
                             Bulk Blast
+                        </span>
+                        <span
+                            style={{ marginLeft: '20px', cursor: 'pointer', opacity: activeSubTab === 'channel' ? 1 : 0.5, fontWeight: 'bold', color: activeSubTab === 'channel' ? '#818cf8' : 'inherit' }}
+                            onClick={() => setActiveSubTab('channel')}
+                        >
+                            Channel Blast
                         </span>
                     </div>
 
@@ -438,6 +474,50 @@ function MessagingCenter() {
                             {bulkStatus && <div style={{ marginTop: '10px', color: '#10b981' }}>{bulkStatus}</div>}
                         </form>
                     )}
+                </div>
+            )}
+
+            {activeSubTab === 'channel' && (
+                <div className="card">
+                    <form onSubmit={handleSendChannel}>
+                        <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '15px' }}>
+                            Send a message to a configured Channel or Group. (Default: @PP_test123 for Telegram)
+                        </p>
+
+                        <div className="form-group">
+                            <label>Messenger Preference</label>
+                            <select value={channelMessenger} onChange={e => setChannelMessenger(e.target.value)}>
+                                <option value="telegram">Telegram</option>
+                                <option value="whatsapp">WhatsApp</option>
+                                <option value="mail">Email</option>
+                                <option value="discord">Discord</option>
+                            </select>
+                            {(channelMessenger !== 'telegram') && <div style={{ fontSize: '11px', color: '#f59e0b', marginTop: '4px' }}>
+                                Warning: Only Telegram has a configured default channel ID in .env currently.
+                            </div>}
+                        </div>
+
+                        <div className="form-group">
+                            <label>Message</label>
+                            <textarea
+                                style={textAreaStyle}
+                                value={channelText}
+                                onChange={e => setChannelText(e.target.value)}
+                                required
+                            />
+                            <div style={{ textAlign: 'right', fontSize: '11px', color: '#94a3b8' }}>
+                                {channelText.length} chars
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label>Link (Optional)</label>
+                            <input type="text" value={channelLink} onChange={e => setChannelLink(e.target.value)} placeholder="https://..." />
+                        </div>
+
+                        <button className="primary" type="submit">Send to Channel</button>
+                        {channelStatus && <div style={{ marginTop: '10px', color: '#10b981' }}>{channelStatus}</div>}
+                    </form>
                 </div>
             )}
 
