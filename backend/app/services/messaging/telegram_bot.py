@@ -95,28 +95,16 @@ class TelegramBotService:
                     
                 # Extract message details
                 chat_id = message.get("chat", {}).get("id")
-                user_id_telegram = message.get("from", {}).get("id")
-                # Get the telegram username (grazier_shahid in example)
+                telegram_user_id = message.get("from", {}).get("id")
                 telegram_username_handle = message.get("from", {}).get("username", "") 
                 text = message.get("text", "").strip()
                 
                 if not chat_id or not text:
                     continue
                 
-                # Check for linking attempt
-                # Logic: Treat text as potential username. 
-                # If it starts with /start, strip it. If just text, use it as is.
-                potential_username = text
-                if text.startswith("/start"):
-                    parts = text.split(maxsplit=1)
-                    if len(parts) > 1:
-                        potential_username = parts[1].strip()
-                    else:
-                        potential_username = "" # Just /start with no username
-                
-                if potential_username:
-                    self._handle_user_linking(db, chat_id, user_id_telegram, telegram_username_handle, potential_username)
-                    processed_count += 1
+                # Use unified handler
+                self.handle_message(db, chat_id, telegram_user_id, telegram_username_handle, text)
+                processed_count += 1
                 
                 # Update last processed ID
                 if update_id and update_id > self.last_update_id:
@@ -127,6 +115,35 @@ class TelegramBotService:
                 continue
         
         return processed_count
+    
+    def handle_message(self, db: Session, chat_id: int, telegram_user_id: int, telegram_username_handle: str, text: str):
+        """
+        Unified message handler for both polling and webhooks.
+        Processes commands and linking attempts.
+        """
+        text = text.strip()
+        if not text:
+            return
+
+        # Check for linking attempt
+        # Logic: Treat text as potential username. 
+        # If it starts with /start, strip it. If just text, use it as is.
+        potential_username = text
+        if text.startswith("/start"):
+            parts = text.split(maxsplit=1)
+            if len(parts) > 1:
+                potential_username = parts[1].strip()
+            else:
+                # Just /start with no username
+                self.send_message(
+                    chat_id=chat_id,
+                    text=f"👋 Welcome! To link your account, please use /start followed by your username.\n"
+                         f"Example: `/start your_username`"
+                )
+                return
+        
+        if potential_username:
+            self._handle_user_linking(db, chat_id, telegram_user_id, telegram_username_handle, potential_username)
     
     def _handle_user_linking(self, db: Session, chat_id: int, telegram_user_id: int, telegram_username_handle: str, provided_username: str):
         """
@@ -144,6 +161,12 @@ class TelegramBotService:
             
             if not user:
                 logger.info(f"[Telegram Bot] Username '{provided_username}' not found in DB.")
+                self.send_message(
+                    chat_id=chat_id,
+                    text=f"❌ Account linking failed.\n"
+                         f"The username '{provided_username}' was not found.\n\n"
+                         f"Please make sure you have an account and that you typed the username correctly."
+                )
                 return
             
             logger.info(f"[Telegram Bot] Found user: {user.username} (ID: {user.id})")

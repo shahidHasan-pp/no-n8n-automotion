@@ -35,13 +35,14 @@ async def telegram_webhook(
             
         chat_id = message.get("chat", {}).get("id")
         telegram_user_id = message.get("from", {}).get("id")
+        telegram_username = message.get("from", {}).get("username", "")
         text = message.get("text", "")
         
-        if text.startswith("/start"):
-            telegram_bot_service._handle_start_command(db, chat_id, telegram_user_id, text)
-            return {"status": "processed", "command": "start"}
+        if chat_id and text:
+            telegram_bot_service.handle_message(db, chat_id, telegram_user_id, telegram_username, text)
+            return {"status": "processed"}
             
-        return {"status": "ignored", "reason": "not a command"}
+        return {"status": "ignored", "reason": "incomplete message data"}
         
     except Exception as e:
         logger.error(f"[Telegram Webhook] Error: {e}")
