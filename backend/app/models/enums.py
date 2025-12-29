@@ -24,3 +24,8 @@ class MessengerType(str, enum.Enum):
 class PlatformStatus(str, enum.Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
+
+class PlatformType(str, enum.Enum):
+    QUIZARD = "quizard"
+    WORDLY = "wordly"
+    ARCADERUSH = "arcaderush"

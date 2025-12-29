@@ -8,8 +8,8 @@ class Subscription(BaseModel):
     __tablename__ = "subscriptions"
     
     name = Column(String(255), nullable=False)
-    type = Column(SQLEnum(SubscriptionType), nullable=False)
-    time = Column(SQLEnum(SubscriptionLength), nullable=False)
+    type = Column(SQLEnum(SubscriptionType), nullable=True)
+    time = Column(SQLEnum(SubscriptionLength), nullable=True)
     offer = Column(String(255), nullable=True)
     prize = Column(String(255), nullable=True)
     remark = Column(JSON, nullable=True, default=[])

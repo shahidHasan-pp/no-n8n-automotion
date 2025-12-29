@@ -2,7 +2,7 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app import crud, schemas
+from app import crud, schemas, models
 from app.api import deps
 from app.utils.logger import get_logger
 
@@ -17,10 +17,14 @@ def sync_user(
     user_in: schemas.UserCreate
 ) -> Any:
     """
-    Sync user data from external services.
+    Step 2 in Flow: Sync user data from external services.
     Updates if exists (by email or username), creates otherwise.
+    Ensures a Messenger profile exists for future Telegram/Discord linking.
     """
-    user = crud.user.get_by_email(db, email=user_in.email)
+    user = None
+    if user_in.email:
+        user = crud.user.get_by_email(db, email=user_in.email)
+    
     if not user:
         user = crud.user.get_by_username(db, username=user_in.username)
     
@@ -34,6 +38,20 @@ def sync_user(
         user = crud.user.create(db, obj_in=user_in)
         logger.info(f"Created new user: {user.username}")
     
+    # Ensure Messenger profile exists
+    if not user.messenger_id:
+        messenger_profile = crud.messenger.create(db, obj_in={
+            "mail": {},
+            "telegram": {},
+            "whatsapp": {},
+            "discord": {}
+        })
+        user.messenger_id = messenger_profile.id
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        logger.info(f"Initialized messenger profile for user: {user.username}")
+    
     return user
 
 @router.post("/sync-subscription", response_model=schemas.Subscription)
@@ -43,7 +61,7 @@ def sync_subscription(
     subscription_in: schemas.SubscriptionCreate
 ) -> Any:
     """
-    Sync subscription data from external services.
+    Step 1 in Flow: Sync subscription data from external services.
     Updates if exists (by name), creates otherwise.
     """
     subscription = crud.subscription.get_by_name(db, name=subscription_in.name)
@@ -109,32 +127,47 @@ def link_user_subscription(
     link_in: schemas.WebhookUserSubscribedCreate
 ) -> Any:
     """
-    Link a user to a subscription by username and subscription name.
+    Step 3 in Flow: Link a user to a subscription by username and subscription name.
+    Expects names to exist already via previous sync steps.
     """
     # Lookup user
     user = crud.user.get_by_username(db, username=link_in.username)
     if not user:
-        raise HTTPException(status_code=404, detail=f"User '{link_in.username}' not found")
+        raise HTTPException(status_code=404, detail=f"User '{link_in.username}' not found. Ensure User Sync was called.")
     
     # Lookup subscription
     subscription = crud.subscription.get_by_name(db, name=link_in.subs)
     if not subscription:
-        raise HTTPException(status_code=404, detail=f"Subscription '{link_in.subs}' not found")
+        raise HTTPException(status_code=404, detail=f"Subscription '{link_in.subs}' not found. Ensure Subscription Sync was called.")
         
-    # Prepare internal link object
-    internal_link_in = schemas.UserSubscribedCreate(
-        user_id=user.id,
-        subs_id=subscription.id,
-        start_date=link_in.start_date,
-        end_date=link_in.end_date
-    )
+    # Check if this link already exists to avoid duplicates
+    existing_link = db.query(models.UserSubscribed).filter(
+        models.UserSubscribed.user_id == user.id,
+        models.UserSubscribed.subs_id == subscription.id
+    ).first()
     
-    user_sub = crud.user_subscribed.create(db, obj_in=internal_link_in)
+    if existing_link:
+        # Update existing link dates if provided
+        if link_in.start_date:
+            existing_link.start_date = link_in.start_date
+        if link_in.end_date:
+            existing_link.end_date = link_in.end_date
+        db.add(existing_link)
+    else:
+        # Create internal link object
+        internal_link_in = schemas.UserSubscribedCreate(
+            user_id=user.id,
+            subs_id=subscription.id,
+            start_date=link_in.start_date,
+            end_date=link_in.end_date
+        )
+        existing_link = crud.user_subscribed.create(db, obj_in=internal_link_in)
     
-    # Also update the user's primary subscription_id
+    # Also update the user's primary subscription_id for easier access
     user.subscription_id = subscription.id
     db.add(user)
     db.commit()
+    db.refresh(existing_link)
     
     logger.info(f"Linked user {user.username} to subscription {subscription.name}")
-    return user_sub
+    return existing_link

@@ -8,8 +8,8 @@ from .base import BaseSchema
 # Subscription Schemas matches the single table requirement
 class SubscriptionBase(BaseModel):
     name: str
-    type: SubscriptionType
-    time: SubscriptionLength
+    type: Optional[SubscriptionType] = None
+    time: Optional[SubscriptionLength] = None
     offer: Optional[str] = None
     prize: Optional[str] = None
     remark: List[Any] = []

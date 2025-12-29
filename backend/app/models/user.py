@@ -8,7 +8,7 @@ class User(BaseModel):
 
     username = Column(String(255), unique=True, index=True, nullable=False)
     full_name = Column(String(255), nullable=True)
-    email = Column(String(255), unique=True, index=True, nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=True)
     phone_number = Column(String(50), nullable=True)
     
     quiz_ids = Column(JSON, nullable=True, default=[])
