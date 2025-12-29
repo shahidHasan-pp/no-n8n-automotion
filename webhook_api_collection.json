@@ -1,0 +1,137 @@
+{
+    "info": {
+        "_postman_id": "7a3b1c2e-4d5f-6a7b-8c9d-0e1f2a3b4c5d",
+        "name": "Notification Service - Webhooks (Name Based)",
+        "description": "Collection for synchronizing data from external services using names/usernames instead of internal IDs.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "User Sync",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"username\": \"test_user\",\n    \"email\": \"test@example.com\",\n    \"full_name\": \"Test User\",\n    \"phone_number\": \"+1234567890\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/v1/webhook/sync-user",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "api",
+                        "v1",
+                        "webhook",
+                        "sync-user"
+                    ]
+                },
+                "description": "Syncs user data using username and email."
+            },
+            "response": []
+        },
+        {
+            "name": "Subscription Sync",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"name\": \"Saap Ludu\",\n    \"type\": \"PREMIUM\",\n    \"time\": \"MONTHLY\",\n    \"amount\": 10,\n    \"offer\": \"50% discount for new user\",\n    \"prize\": \"macBook\",\n    \"remark\": [\"High priority\", \"All channels\"]\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/v1/webhook/sync-subscription",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "api",
+                        "v1",
+                        "webhook",
+                        "sync-subscription"
+                    ]
+                },
+                "description": "Syncs subscription metadata by name."
+            },
+            "response": []
+        },
+        {
+            "name": "Record Quiz Result",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"username\": \"test_user\",\n    \"subs\": \"Saap Ludu\",\n    \"score\": 10,\n    \"time\": 120\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/v1/webhook/record-quiz",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "api",
+                        "v1",
+                        "webhook",
+                        "record-quiz"
+                    ]
+                },
+                "description": "Records a quiz game result using username and subscription name."
+            },
+            "response": []
+        },
+        {
+            "name": "Link User to Subscription",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"username\": \"test_user\",\n    \"subs\": \"Saap Ludu\",\n    \"start_date\": \"2024-12-28T00:00:00\",\n    \"end_date\": \"2025-01-28T00:00:00\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/v1/webhook/link-user-subscription",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "api",
+                        "v1",
+                        "webhook",
+                        "link-user-subscription"
+                    ]
+                },
+                "description": "Links a user to a subscription using username and subscription name."
+            },
+            "response": []
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:8000",
+            "type": "string"
+        }
+    ]
+}

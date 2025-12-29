@@ -5,4 +5,8 @@ from .messenger import (
     Messenger, MessengerCreate, MessengerUpdate,
     Message, MessageCreate
 )
-from .quiz import Quiz, QuizCreate, QuizUpdate
+from .quiz import (
+    Quiz, QuizCreate, QuizUpdate, 
+    UserSubscribed, UserSubscribedCreate,
+    WebhookQuizCreate, WebhookUserSubscribedCreate
+)

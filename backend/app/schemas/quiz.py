@@ -34,3 +34,15 @@ class QuizUpdate(QuizBase):
 
 class Quiz(QuizBase, BaseSchema):
     subscription: Optional[Subscription] = None
+
+class WebhookQuizCreate(BaseModel):
+    username: str
+    subs: str
+    score: int = 0
+    time: Optional[int] = None
+
+class WebhookUserSubscribedCreate(BaseModel):
+    username: str
+    subs: str
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
