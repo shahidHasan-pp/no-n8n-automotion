@@ -48,7 +48,7 @@
                 ],
                 "body": {
                     "mode": "raw",
-                    "raw": "{\n    \"name\": \"Saap Ludu\",\n    \"type\": \"PREMIUM\",\n    \"time\": \"MONTHLY\",\n    \"amount\": 10,\n    \"offer\": \"50% discount for new user\",\n    \"prize\": \"macBook\",\n    \"remark\": [\"High priority\", \"All channels\"]\n}"
+                    "raw": "{\n    \"name\": \"Saap Ludu\",\n    \"type\": \"PREMIUM\",\n    \"time\": \"MONTHLY\",\n    \"platform\": \"quizard\",\n    \"amount\": 10,\n    \"offer\": \"50% discount for new user\",\n    \"prize\": \"macBook\",\n    \"remark\": [\"High priority\", \"All channels\"]\n}"
                 },
                 "url": {
                     "raw": "{{base_url}}/api/v1/webhook/sync-subscription",
@@ -130,7 +130,7 @@
     "variable": [
         {
             "key": "base_url",
-            "value": "http://localhost:8000",
+            "value": "http://192.168.5.12:8000",
             "type": "string"
         }
     ]
