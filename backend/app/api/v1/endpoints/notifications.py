@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.services.messaging import messaging_service
-from app.models.enums import MessengerType
+from app.models.enums import MessengerType, NotificationContextType
 from app.crud import user as user_crud
 
 router = APIRouter()
@@ -40,6 +40,33 @@ def send_manual_notification(
         return {"status": "success", "message": "Notification sent"}
     else:
         raise HTTPException(status_code=500, detail="Failed to send notification")
+
+@router.post("/send-contextual")
+def send_contextual_notification(
+    context_type: NotificationContextType,
+    messenger_type: MessengerType,
+    subscription_id: int = None,
+    text: str = None,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Send notifications based on a specific business context (rankings, streaks, etc.)
+    Allows overriding the message content.
+    """
+    result = messaging_service.send_contextual_messages(db, context_type, messenger_type, subscription_id, custom_text=text)
+    return result
+
+@router.get("/preview-contextual")
+def preview_contextual_notification(
+    context_type: NotificationContextType,
+    subscription_id: int = None,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Generate a preview of the contextual message and see who it targets.
+    """
+    result = messaging_service.preview_contextual_messages(db, context_type, subscription_id)
+    return result
 
 @router.post("/trigger-logic-check")
 def trigger_logic_check(

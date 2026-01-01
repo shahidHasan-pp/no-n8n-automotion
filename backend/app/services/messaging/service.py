@@ -1,7 +1,12 @@
-
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
+from datetime import datetime, date
 from sqlalchemy.orm import Session
-from app.models.enums import MessengerType
+from sqlalchemy import func, and_
+from app.models.enums import MessengerType, NotificationContextType
+from app.models.user import User
+from app.models.quiz import Quiz, UserSubscribed
+from app.models.subscription import Subscription
+from app.core.config import settings
 from app.crud import message as message_crud
 from app.schemas.messenger import MessageCreate
 from app.utils.logger import get_logger
@@ -83,6 +88,140 @@ class MessagingService:
             logger.error(f"Failed to log message to DB: {e}")
             
         return success
+
+    def preview_contextual_messages(self, db: Session, context_type: NotificationContextType, subscription_id: Optional[int] = None) -> dict:
+        """
+        Preview what the message would look like for a given context.
+        Returns a draft message and targeting info.
+        """
+        draft = ""
+        target_summary = ""
+
+        if context_type == NotificationContextType.TOP_RANKERS:
+            draft = "🏆 Congratulations! You are among the top rankers! Your total score is {total_score}."
+            query = db.query(User.username).join(Quiz, User.id == Quiz.user_id)
+            if subscription_id:
+                query = query.filter(Quiz.subs_id == subscription_id)
+            top_players = query.group_by(User.id).order_by(func.sum(Quiz.score).desc()).limit(3).all()
+            names = ", ".join([p.username for p in top_players])
+            target_summary = f"Targets top 3 players: {names}"
+
+        elif context_type == NotificationContextType.INSPIRING_TOP_10_30:
+            draft = "Keep pushing! You're currently ranked in the top 30 with {total_score} points. You can do it!"
+            target_summary = "Targets players ranked 10-30 on the leaderboard."
+
+        elif context_type == NotificationContextType.SOFT_REMINDER:
+            draft = "👋 Don't forget to play your quizzes today! Your streak is at risk."
+            target_summary = "Targets all subscribed users who haven't played today."
+
+        elif context_type == NotificationContextType.CHANNEL_PROMO:
+            draft = "🚀 Unlock more rewards! Subscribe to our premium packages for exclusive tournaments."
+            target_summary = "Broadcast to the configured community channel."
+
+        elif context_type == NotificationContextType.CHANNEL_CONGRATS_TOP_5:
+            # For this one, we actually calculate the names into the draft
+            query = db.query(User.username).join(Quiz, User.id == Quiz.user_id)
+            if subscription_id:
+                query = query.filter(Quiz.subs_id == subscription_id)
+            top_5 = query.group_by(User.id).order_by(func.sum(Quiz.score).desc()).limit(5).all()
+            names = ", ".join([f"@{p.username}" for p in top_5])
+            draft = f"🎉 Huge congratulations to our Top 5 players: {names}! Amazing job this week! 🥳"
+            target_summary = "Broadcast to the configured community channel."
+
+        return {
+            "draft": draft,
+            "target_summary": target_summary,
+            "context_type": context_type
+        }
+
+    def send_contextual_messages(self, db: Session, context_type: NotificationContextType, messenger_type: MessengerType, subscription_id: Optional[int] = None, custom_text: Optional[str] = None) -> dict:
+        """
+        Send messages based on specific user activities and context.
+        Allows custom_text override from frontend.
+        """
+        count = 0
+        
+        if context_type == NotificationContextType.TOP_RANKERS:
+            # Logic: Get top 3 players (by score) for a subscription or overall
+            query = db.query(User.id, User.username, func.sum(Quiz.score).label('total_score'))\
+                .join(Quiz, User.id == Quiz.user_id)
+            
+            if subscription_id:
+                query = query.filter(Quiz.subs_id == subscription_id)
+            
+            top_players = query.group_by(User.id).order_by(func.sum(Quiz.score).desc()).limit(3).all()
+            
+            for i, p in enumerate(top_players):
+                if custom_text:
+                    text = custom_text.replace("{total_score}", str(p.total_score)).replace("{username}", p.username)
+                else:
+                    messages = [
+                        "🏆 Congratulations! You are among the top rankers!",
+                        "🔥 Incredible performance! You're dominating the leaderboard.",
+                        "⭐ Keep it up! You are in the top 3!"
+                    ]
+                    msg_template = messages[i if i < len(messages) else 0]
+                    text = f"{msg_template} Your total score is {p.total_score}."
+                
+                self.send_message(db, messenger_type, "resolve_from_user_id", text, user_id=p.id)
+                count += 1
+
+        elif context_type == NotificationContextType.INSPIRING_TOP_10_30:
+            sub_query = db.query(User.id, User.username, func.sum(Quiz.score).label('total_score'))\
+                .join(Quiz, User.id == Quiz.user_id)
+            if subscription_id:
+                sub_query = sub_query.filter(Quiz.subs_id == subscription_id)
+            
+            targets = sub_query.group_by(User.id).order_by(func.sum(Quiz.score).desc()).offset(9).limit(21).all()
+            
+            for p in targets:
+                if custom_text:
+                    text = custom_text.replace("{total_score}", str(p.total_score)).replace("{username}", p.username)
+                else:
+                    text = f"Keep pushing! You're currently ranked in the top 30 with {p.total_score} points. You can do it!"
+                self.send_message(db, messenger_type, "resolve_from_user_id", text, user_id=p.id)
+                count += 1
+
+        elif context_type == NotificationContextType.SOFT_REMINDER:
+            # Users with active subscriptions
+            sub_users_query = db.query(User.id).join(UserSubscribed, User.id == UserSubscribed.user_id)
+            if subscription_id:
+                sub_users_query = sub_users_query.filter(UserSubscribed.subs_id == subscription_id)
+            
+            # Subscribed users who haven't played today
+            played_today = db.query(Quiz.user_id).filter(func.date(Quiz.created_at) == date.today()).subquery()
+            users_to_remind = sub_users_query.filter(User.id.notin_(played_today)).all()
+            
+            for u in users_to_remind:
+                text = custom_text if custom_text else "👋 Don't forget to play your quizzes today! Your streak is at risk."
+                link = "https://yourplaylink.com" 
+                self.send_message(db, messenger_type, "resolve_from_user_id", text, link=link, user_id=u.id)
+                count += 1
+
+        elif context_type == NotificationContextType.CHANNEL_PROMO:
+            target = settings.TELEGRAM_CHANNEL_ID if messenger_type == MessengerType.TELEGRAM else None
+            if target:
+                text = custom_text if custom_text else "🚀 Unlock more rewards! Subscribe to our premium packages for exclusive tournaments."
+                self.send_message(db, messenger_type, target, text, link="https://subscribe-here.com")
+                count = 1
+
+        elif context_type == NotificationContextType.CHANNEL_CONGRATS_TOP_5:
+            target = settings.TELEGRAM_CHANNEL_ID if messenger_type == MessengerType.TELEGRAM else None
+            if target:
+                if custom_text:
+                    text = custom_text
+                else:
+                    query = db.query(User.username).join(Quiz, User.id == Quiz.user_id)
+                    if subscription_id:
+                        query = query.filter(Quiz.subs_id == subscription_id)
+                    top_5 = query.group_by(User.id).order_by(func.sum(Quiz.score).desc()).limit(5).all()
+                    names = ", ".join([f"@{p.username}" for p in top_5])
+                    text = f"🎉 Huge congratulations to our Top 5 players: {names}! Amazing job this week! 🥳"
+                
+                self.send_message(db, messenger_type, target, text)
+                count = 1
+
+        return {"status": "success", "processed_count": count}
 
     def process_daily_check(self, db: Session, user_id: int) -> dict:
         """

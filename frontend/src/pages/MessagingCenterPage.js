@@ -33,6 +33,14 @@ function MessagingCenter() {
     const [channelLink, setChannelLink] = useState('');
     const [channelStatus, setChannelStatus] = useState(null);
 
+    // --- State: Send Contextual ---
+    const [contextType, setContextType] = useState('top_rankers');
+    const [contextMessenger, setContextMessenger] = useState('telegram');
+    const [contextSubId, setContextSubId] = useState('all');
+    const [contextText, setContextText] = useState('');
+    const [contextTargetSummary, setContextTargetSummary] = useState('');
+    const [contextStatus, setContextStatus] = useState(null);
+
     // --- State: Shared/Data ---
     const [users, setUsers] = useState([]);
     const [subscriptions, setSubscriptions] = useState([]);
@@ -175,6 +183,54 @@ function MessagingCenter() {
         }
     };
 
+    // --- Logic: Send Contextual ---
+    const handleSyncContextualDraft = async () => {
+        setContextStatus('fetching draft...');
+        let url = `${apiBase}/notifications/preview-contextual?context_type=${contextType}`;
+        if (contextSubId !== 'all') {
+            url += `&subscription_id=${contextSubId}`;
+        }
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (res.ok) {
+                setContextText(data.draft);
+                setContextTargetSummary(data.target_summary);
+                setContextStatus(null);
+            } else {
+                setContextStatus(`Error: ${data.detail || 'Failed to fetch draft'}`);
+            }
+        } catch (e) {
+            setContextStatus('Network Error');
+        }
+    };
+
+    const handleSendContextual = async (e) => {
+        e.preventDefault();
+        setContextStatus('processing...');
+
+        let url = `${apiBase}/notifications/send-contextual?context_type=${contextType}&messenger_type=${contextMessenger}`;
+        if (contextSubId !== 'all') {
+            url += `&subscription_id=${contextSubId}`;
+        }
+        if (contextText) {
+            url += `&text=${encodeURIComponent(contextText)}`;
+        }
+
+        try {
+            const res = await fetch(url, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                setContextStatus(`Success! Processed ${data.processed_count} targeted messages.`);
+            } else {
+                setContextStatus(`Error: ${data.detail || 'Failed'}`);
+            }
+        } catch (e) {
+            setContextStatus('Network Error');
+        }
+    };
+
     // --- Logic: Settings ---
     const handleUserSelect = async (user) => {
         setSelectedUser(user);
@@ -296,6 +352,12 @@ function MessagingCenter() {
                             onClick={() => setActiveSubTab('channel')}
                         >
                             Channel Blast
+                        </span>
+                        <span
+                            style={{ marginLeft: '20px', cursor: 'pointer', opacity: activeSubTab === 'contextual' ? 1 : 0.5, fontWeight: 'bold', color: activeSubTab === 'contextual' ? '#818cf8' : 'inherit' }}
+                            onClick={() => setActiveSubTab('contextual')}
+                        >
+                            Contextual
                         </span>
                     </div>
 
@@ -474,52 +536,125 @@ function MessagingCenter() {
                             {bulkStatus && <div style={{ marginTop: '10px', color: '#10b981' }}>{bulkStatus}</div>}
                         </form>
                     )}
-                </div>
-            )}
 
-            {activeSubTab === 'channel' && (
-                <div className="card">
-                    <form onSubmit={handleSendChannel}>
-                        <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '15px' }}>
-                            Send a message to a configured Channel or Group. (Default: @PP_test123 for Telegram)
-                        </p>
+                    {activeSubTab === 'channel' && (
+                        <form onSubmit={handleSendChannel}>
+                            <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '15px' }}>
+                                Send a message to a configured Channel or Group. (Default: @PP_test123 for Telegram)
+                            </p>
 
-                        <div className="form-group">
-                            <label>Messenger Preference</label>
-                            <select value={channelMessenger} onChange={e => setChannelMessenger(e.target.value)}>
-                                <option value="telegram">Telegram</option>
-                                <option value="whatsapp">WhatsApp</option>
-                                <option value="mail">Email</option>
-                                <option value="discord">Discord</option>
-                            </select>
-                            {(channelMessenger !== 'telegram') && <div style={{ fontSize: '11px', color: '#f59e0b', marginTop: '4px' }}>
-                                Warning: Only Telegram has a configured default channel ID in .env currently.
-                            </div>}
-                        </div>
-
-                        <div className="form-group">
-                            <label>Message</label>
-                            <textarea
-                                style={textAreaStyle}
-                                value={channelText}
-                                onChange={e => setChannelText(e.target.value)}
-                                required
-                            />
-                            <div style={{ textAlign: 'right', fontSize: '11px', color: '#94a3b8' }}>
-                                {channelText.length} chars
+                            <div className="form-group">
+                                <label>Messenger Preference</label>
+                                <select value={channelMessenger} onChange={e => setChannelMessenger(e.target.value)}>
+                                    <option value="telegram">Telegram</option>
+                                    <option value="whatsapp">WhatsApp</option>
+                                    <option value="mail">Email</option>
+                                    <option value="discord">Discord</option>
+                                </select>
+                                {(channelMessenger !== 'telegram') && <div style={{ fontSize: '11px', color: '#f59e0b', marginTop: '4px' }}>
+                                    Warning: Only Telegram has a configured default channel ID in .env currently.
+                                </div>}
                             </div>
-                        </div>
 
-                        <div className="form-group">
-                            <label>Link (Optional)</label>
-                            <input type="text" value={channelLink} onChange={e => setChannelLink(e.target.value)} placeholder="https://..." />
-                        </div>
+                            <div className="form-group">
+                                <label>Message</label>
+                                <textarea
+                                    style={textAreaStyle}
+                                    value={channelText}
+                                    onChange={e => setChannelText(e.target.value)}
+                                    required
+                                />
+                                <div style={{ textAlign: 'right', fontSize: '11px', color: '#94a3b8' }}>
+                                    {channelText.length} chars
+                                </div>
+                            </div>
 
-                        <button className="primary" type="submit">Send to Channel</button>
-                        {channelStatus && <div style={{ marginTop: '10px', color: '#10b981' }}>{channelStatus}</div>}
-                    </form>
+                            <div className="form-group">
+                                <label>Link (Optional)</label>
+                                <input type="text" value={channelLink} onChange={e => setChannelLink(e.target.value)} placeholder="https://..." />
+                            </div>
+
+                            <button className="primary" type="submit">Send to Channel</button>
+                            {channelStatus && <div style={{ marginTop: '10px', color: '#10b981' }}>{channelStatus}</div>}
+                        </form>
+                    )}
+
+                    {activeSubTab === 'contextual' && (
+                        <form onSubmit={handleSendContextual}>
+                            <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '15px' }}>
+                                Trigger messages based on automated business logic and user rankings.
+                            </p>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                                <div className="form-group">
+                                    <label>Context Strategy</label>
+                                    <select value={contextType} onChange={e => setContextType(e.target.value)}>
+                                        <option value="top_rankers">Top Rankers (Direct Msg)</option>
+                                        <option value="inspiring_top_10_30">Top 10-30 (Inspiring Msg)</option>
+                                        <option value="soft_reminder">Soft Reminder (Subscribed but Not Played Today)</option>
+                                        <option value="channel_promo">Channel Promo (Subscribe to Packages)</option>
+                                        <option value="channel_congrats_top_5">Channel Congrats (Mention Top 5)</option>
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Target Subscription</label>
+                                    <select value={contextSubId} onChange={e => setContextSubId(e.target.value)}>
+                                        <option value="all">Across All Subscriptions</option>
+                                        {subscriptions.map(s => (
+                                            <option key={s.id} value={s.id}>{s.name} ({s.platform})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                className="secondary"
+                                style={{ width: '100%', marginBottom: '20px', border: '1px dashed #6366f1', color: '#818cf8' }}
+                                onClick={handleSyncContextualDraft}
+                            >
+                                🔄 Sync Message Based on Context
+                            </button>
+
+                            {contextTargetSummary && (
+                                <div style={{ fontSize: '12px', color: '#94a3b8', background: '#1e293b', padding: '10px', borderRadius: '4px', marginBottom: '15px', borderLeft: '3px solid #6366f1' }}>
+                                    <strong>Targeting:</strong> {contextTargetSummary}
+                                </div>
+                            )}
+
+                            <div className="form-group">
+                                <label>Message (Edit before sending)</label>
+                                <textarea
+                                    style={textAreaStyle}
+                                    value={contextText}
+                                    onChange={e => setContextText(e.target.value)}
+                                    placeholder="Click 'Sync Message Based on Context' or type here..."
+                                    required
+                                />
+                                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                                    Tip: You can use {"{total_score}"} and {"{username}"} tokens for individual messages.
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Messenger Preference</label>
+                                <select value={contextMessenger} onChange={e => setContextMessenger(e.target.value)}>
+                                    <option value="telegram">Telegram</option>
+                                    <option value="whatsapp">WhatsApp</option>
+                                    <option value="mail">Email</option>
+                                    <option value="discord">Discord</option>
+                                </select>
+                            </div>
+
+                            <button className="primary" type="submit">Send Contextual Messages</button>
+                            {contextStatus && <div style={{ marginTop: '10px', color: '#10b981' }}>{contextStatus}</div>}
+                        </form>
+                    )}
                 </div>
             )}
+
+
 
             {activeTab === 'settings' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>

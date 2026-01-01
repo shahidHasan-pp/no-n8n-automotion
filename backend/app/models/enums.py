@@ -29,3 +29,10 @@ class PlatformType(str, enum.Enum):
     QUIZARD = "quizard"
     WORDLY = "wordly"
     ARCADERUSH = "arcaderush"
+
+class NotificationContextType(str, enum.Enum):
+    TOP_RANKERS = "top_rankers"
+    INSPIRING_TOP_10_30 = "inspiring_top_10_30"
+    SOFT_REMINDER = "soft_reminder"
+    CHANNEL_PROMO = "channel_promo"
+    CHANNEL_CONGRATS_TOP_5 = "channel_congrats_top_5"
