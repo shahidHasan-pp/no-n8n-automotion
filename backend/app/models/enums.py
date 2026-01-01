@@ -36,3 +36,15 @@ class NotificationContextType(str, enum.Enum):
     SOFT_REMINDER = "soft_reminder"
     CHANNEL_PROMO = "channel_promo"
     CHANNEL_CONGRATS_TOP_5 = "channel_congrats_top_5"
+
+class MessageScenarioType(str, enum.Enum):
+    UNSUBSCRIBED_REMINDER = "unsubscribed_reminder"
+    DAILY_SCORE_UPDATE = "daily_score_update"
+    EVE_SCORE_RANKING = "eve_score_ranking"
+    SUBSCRIPTION_EXPIRY = "subscription_expiry"
+    INACTIVE_SUBSCRIBER = "inactive_subscriber"
+    DAILY_PLAY_REMINDER = "daily_play_reminder"
+    DAILY_WINNER_CONGRATS = "daily_winner_congrats"
+    DAILY_REFERRAL_PROMO = "daily_referral_promo"
+    WEEKLY_WINNER_LIST_PROMO = "weekly_winner_list_promo"
+    WINNING_POSITION_WARNING = "winning_position_warning"

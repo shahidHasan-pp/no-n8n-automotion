@@ -227,8 +227,7 @@ class TelegramBotService:
             # Send success message
             self.send_message(
                 chat_id=chat_id,
-                text=f"✅ Successfully linked to account: {user.username}\n"
-                     f"You will now receive notifications here."
+                text=f"Welcome! \nআমাদের সার্ভিস সম্পর্কিত বিস্তারিত সকল তথ্য এখানে পেয়ে যাবেন।"
             )
             
             logger.info(f"[Telegram Bot] SUCCESS: User {provided_username} (ID: {user.id}) linked Telegram chat_id: {chat_id}")

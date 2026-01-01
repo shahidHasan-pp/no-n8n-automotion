@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.services.messaging import messaging_service
-from app.models.enums import MessengerType, NotificationContextType
+from app.models.enums import MessengerType, NotificationContextType, MessageScenarioType
 from app.crud import user as user_crud
 
 router = APIRouter()
@@ -66,6 +66,19 @@ def preview_contextual_notification(
     Generate a preview of the contextual message and see who it targets.
     """
     result = messaging_service.preview_contextual_messages(db, context_type, subscription_id)
+    return result
+
+@router.post("/send-scenario")
+def send_scenario_notification(
+    scenario_type: MessageScenarioType,
+    messenger_type: MessengerType,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Manually trigger one of the business scenarios.
+    Useful for testing or ad-hoc runs.
+    """
+    result = messaging_service.send_scenario_messages(db, scenario_type, messenger_type)
     return result
 
 @router.post("/trigger-logic-check")

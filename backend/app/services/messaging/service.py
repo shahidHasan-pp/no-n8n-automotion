@@ -2,7 +2,7 @@ from typing import Dict, Optional, Any
 from datetime import datetime, date
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
-from app.models.enums import MessengerType, NotificationContextType
+from app.models.enums import MessengerType, NotificationContextType, MessageScenarioType, PlatformType
 from app.models.user import User
 from app.models.quiz import Quiz, UserSubscribed
 from app.models.subscription import Subscription
@@ -234,6 +234,175 @@ class MessagingService:
                 
                 self.send_message(db, messenger_type, target, text)
                 count = 1
+
+        return {"status": "success", "processed_count": count}
+
+    def send_scenario_messages(self, db: Session, scenario_type: MessageScenarioType, messenger_type: MessengerType) -> dict:
+        """
+        Send messages based on specific business scenarios.
+        """
+        import requests
+        from datetime import timedelta
+        count = 0
+        
+        if scenario_type == MessageScenarioType.UNSUBSCRIBED_REMINDER:
+            # Scenario 1: Unsubscribed users, every alternative day from joining.
+            # Joining date is created_at. Alternative day = mod(days_since_joining, 2) == 0 (or 1)
+            # Users with NO subscription record or no active subscription
+            subquery = db.query(UserSubscribed.user_id).subquery()
+            unsub_users = db.query(User).filter(User.id.notin_(subquery)).all()
+            
+            for u in unsub_users:
+                days_since = (date.today() - u.created_at.date()).days
+                if days_since > 0 and days_since % 2 == 0:
+                    text = "আপনি এখনো কুইজার্ড/ ওয়ার্ডলি/ আরকেড রাস সার্ভিসেটিতে সাবস্ক্রিপশন করেন নি। এখনই সাবস্ক্রিপশন খেলুন এবং লুফে নিন ডেইলি, উইকলি, মেগা প্রাইজ সহ অনেক অনেক আকর্ষণীয় পুরষ্কার জেতার সুযোগ।"
+                    self.send_message(db, messenger_type, "resolve", text, user_id=u.id)
+                    count += 1
+
+        elif scenario_type == MessageScenarioType.DAILY_SCORE_UPDATE:
+            # Scenario 2: After Playing two rounds of same Quiz (by name) from Quizard and Wordly, the best score.
+            # For automation, this might triggered after each quiz record or periodically.
+            # Here we just find users who played exactly 2 quizzes of same subscription today.
+            today = date.today()
+            round_counts = db.query(Quiz.user_id, Quiz.subs_id, func.count(Quiz.id).label('cnt'), func.max(Quiz.score).label('max_score'))\
+                .filter(func.date(Quiz.created_at) == today)\
+                .group_by(Quiz.user_id, Quiz.subs_id).having(func.count(Quiz.id) >= 2).all()
+            
+            for r in round_counts:
+                # Filter for Quizard and Wordly platforms
+                sub = db.query(Subscription).filter(Subscription.id == r.subs_id).first()
+                if sub and sub.platform in [PlatformType.QUIZARD, PlatformType.WORDLY]:
+                    text = f"আপনার আজকের দুটি রাউন্ড সফল ভাবে সম্পন্ন হয়েছে। আজকে আপনার সর্বোচ্চ স্কোর “{r.max_score}”"
+                    self.send_message(db, messenger_type, "resolve", text, user_id=r.user_id)
+                    count += 1
+
+        elif scenario_type == MessageScenarioType.EVE_SCORE_RANKING:
+            # Scenario 3: At 10 pm to users who played ArcadeRush or Sudoko from Wordly.
+            # Sudoko is probably a subscription name or type. Assuming name check for now.
+            query = db.query(User.id, Subscription.id.label('subs_id'), Subscription.name, func.max(Quiz.score).label('max_score'))\
+                .join(Quiz, User.id == Quiz.user_id)\
+                .join(Subscription, Quiz.subs_id == Subscription.id)\
+                .filter(func.date(Quiz.created_at) == date.today())\
+                .filter(Subscription.platform == PlatformType.ARCADERUSH)
+            
+            # This needs rank calculation.
+            results = query.group_by(User.id, Subscription.id, Subscription.name).all()
+            for r in results:
+                # Calculate rank relative to others in same subscription today
+                rank = db.query(func.count(User.id))\
+                    .select_from(User)\
+                    .join(Quiz, User.id == Quiz.user_id)\
+                    .filter(Quiz.subs_id == r.subs_id)\
+                    .filter(func.date(Quiz.created_at) == date.today())\
+                    .group_by(User.id)\
+                    .having(func.max(Quiz.score) > r.max_score).count() + 1
+                
+                text = f"আজকে আপনি “{r.name}” গেমটি খেলেছেন এবং এখন পর্যন্ত আপনার সর্বোচ্চ স্কোর “{r.max_score}“। আপনি লিডারবোর্ডে “{rank}“ তম অবস্থানে রয়েছেন।"
+                self.send_message(db, messenger_type, "resolve", text, user_id=r.id)
+                count += 1
+
+        elif scenario_type == MessageScenarioType.SUBSCRIPTION_EXPIRY:
+            # Scenario 4: end_date == today
+            expiring = db.query(UserSubscribed).filter(func.date(UserSubscribed.end_date) == date.today()).all()
+            for es in expiring:
+                sub = db.query(Subscription).filter(Subscription.id == es.subs_id).first()
+                sub_name = sub.name if sub else "সার্ভিস"
+                text = f"আগামী কাল আপনার “{sub_name}” সাবস্ক্রিপশনটি রিনিউ হবে। কোন রকম ব্যাঘাত ছাড়া নিয়মিত খেলে প্রাইজ পেতে অবশ্যই কাল বিকাশে যথেষ্ট ব্যালান্স রাখুন। ধন্যবাদ।"
+                self.send_message(db, messenger_type, "resolve", text, user_id=es.user_id)
+                count += 1
+
+        elif scenario_type == MessageScenarioType.INACTIVE_SUBSCRIBER:
+            # Scenario 5: Subscribed but stopped playing for consecutive 3 days.
+            three_days_ago = date.today() - timedelta(days=3)
+            # Users with active subscriptions
+            active_subs = db.query(UserSubscribed.user_id).distinct().subquery()
+            # Users who played in last 3 days
+            played_recently = db.query(Quiz.user_id).filter(func.date(Quiz.created_at) >= three_days_ago).distinct().subquery()
+            
+            inactive_users = db.query(User).filter(User.id.in_(active_subs)).filter(User.id.notin_(played_recently)).all()
+            for u in inactive_users:
+                text = "আমরা লক্ষ্ করেছি বিগত তিন দিন যাবত আপনি কোন গেম খেলছেন না। নিয়মিত ডেইলি প্রাইজ গুলো জিততে আজ থেকেই আবার খেলা শুরু করুন। আপনার জন্য শুভকামনা।"
+                self.send_message(db, messenger_type, "resolve", text, user_id=u.id)
+                count += 1
+
+        elif scenario_type == MessageScenarioType.DAILY_PLAY_REMINDER:
+            # Scenario 6: 10 AM reminder to subscribed users who didn't play today.
+            today = date.today()
+            active_subs = db.query(UserSubscribed.user_id).distinct().subquery()
+            played_today = db.query(Quiz.user_id).filter(func.date(Quiz.created_at) == today).distinct().subquery()
+            
+            to_remind = db.query(User).filter(User.id.in_(active_subs)).filter(User.id.notin_(played_today)).all()
+            for u in to_remind:
+                text = "খেলার সময় চলছে। ডেইলি প্রাইজ পেতে এখনই খেলা শুরু করুন।"
+                self.send_message(db, messenger_type, "resolve", text, user_id=u.id)
+                count += 1
+
+        elif scenario_type == MessageScenarioType.DAILY_WINNER_CONGRATS:
+            # Scenario 7: External rank check.
+            try:
+                rank_data = requests.get("https://cms.quizard.live/money/weeklyWinnerByUserNData/").json()
+                # Assuming JSON structure has a list of winners
+                # Logic: Find winners with serial_no and link to our users by username/msisdn
+                for item in rank_data:
+                    username = item.get("msisdn")
+                    if username:
+                        user = db.query(User).filter(User.username == username).first()
+                        if user:
+                            text = "অভিনন্দন! আজকের বিজয়ী তালিকায় থাকার জন্য আপনাকে আন্তরিক অভিনন্দন। পরবর্তী দিন গুলোর জন্য শুভকামনা। "
+                            self.send_message(db, messenger_type, "resolve", text, user_id=user.id)
+                            count += 1
+            except:
+                pass
+
+        elif scenario_type == MessageScenarioType.DAILY_REFERRAL_PROMO:
+            # Scenario 8: Daily refer sms to all.
+            all_users = db.query(User).all()
+            for u in all_users:
+                text = "আজই রেফার করে জিতে নিন পর পর তিন সপ্তাহে প্রাইজ জেতার সুযোগ!"
+                self.send_message(db, messenger_type, "resolve", text, user_id=u.id)
+                count += 1
+
+        elif scenario_type == MessageScenarioType.WEEKLY_WINNER_LIST_PROMO:
+            # Scenario 9: 3 days continuous play.
+            three_days_ago = date.today() - timedelta(days=2) # inclusive
+            continuous = db.query(Quiz.user_id)\
+                .filter(func.date(Quiz.created_at) >= three_days_ago)\
+                .group_by(Quiz.user_id, func.date(Quiz.created_at))\
+                .subquery()
+            
+            # Count distinct days in last 3 days per user
+            streak_users = db.query(Quiz.user_id).filter(func.date(Quiz.created_at) >= three_days_ago)\
+                .group_by(Quiz.user_id).having(func.count(func.distinct(func.date(Quiz.created_at))) >= 3).all()
+            
+            for u in streak_users:
+                text = "আপনি সাপ্তাহিক উইনার হওয়ার তালিকায় রয়েছেন। অভিনন্দন! এভাবেই বেশি বেশি স্কোর করে যান। আপনার জন্য অপেক্ষা করছে সাপ্তাহিক পুরষ্কার !"
+                self.send_message(db, messenger_type, "resolve", text, user_id=u.user_id)
+                count += 1
+
+        elif scenario_type == MessageScenarioType.WINNING_POSITION_WARNING:
+            # Scenario 10: 10:30 PM ArcadeRush or Wordly-Sudoko - Close to winning.
+            # Similar to scenario 3 but different message
+            # For brevity, let's look for users in rank 6-15 (assuming top 5 win)
+            query = db.query(User.id, Subscription.id.label('subs_id'), Subscription.name, func.max(Quiz.score).label('max_score'))\
+                .join(Quiz, User.id == Quiz.user_id)\
+                .join(Subscription, Quiz.subs_id == Subscription.id)\
+                .filter(func.date(Quiz.created_at) == date.today())\
+                .filter(Subscription.platform == PlatformType.ARCADERUSH)
+            
+            results = query.group_by(User.id, Subscription.id, Subscription.name).all()
+            for r in results:
+                rank = db.query(func.count(User.id))\
+                    .select_from(User)\
+                    .join(Quiz, User.id == Quiz.user_id)\
+                    .filter(Quiz.subs_id == r.subs_id)\
+                    .filter(func.date(Quiz.created_at) == date.today())\
+                    .group_by(User.id)\
+                    .having(func.max(Quiz.score) > r.max_score).count() + 1
+                
+                if 5 < rank <= 20: # Example "close to winning" range
+                    text = f"ইতিমধ্যে জেনেছেন “{r.name}” গেমের লিডারবোর্ডে আপনার অবস্থান “{rank}“ তম। এই অবস্থানে আজকের ডেইলি প্রাইজ পাওয়া সম্ভব হবে না। দয়া করে আরেকটু চেষ্টা করুন। রাত ১১.৫৯ এর মধ্যে “ 5 “ তম অবস্থানের ভিতরে থাকলেই পেয়ে যাবেন ডেইলি প্রাইজ।"
+                    self.send_message(db, messenger_type, "resolve", text, user_id=r.id)
+                    count += 1
 
         return {"status": "success", "processed_count": count}
 

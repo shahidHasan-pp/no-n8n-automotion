@@ -41,6 +41,11 @@ function MessagingCenter() {
     const [contextTargetSummary, setContextTargetSummary] = useState('');
     const [contextStatus, setContextStatus] = useState(null);
 
+    // --- State: Send Scenario ---
+    const [scenarioType, setScenarioType] = useState('unsubscribed_reminder');
+    const [scenarioMessenger, setScenarioMessenger] = useState('telegram');
+    const [scenarioStatus, setScenarioStatus] = useState(null);
+
     // --- State: Shared/Data ---
     const [users, setUsers] = useState([]);
     const [subscriptions, setSubscriptions] = useState([]);
@@ -231,6 +236,26 @@ function MessagingCenter() {
         }
     };
 
+    // --- Logic: Send Scenario ---
+    const handleSendScenario = async (e) => {
+        e.preventDefault();
+        setScenarioStatus('triggering scenario...');
+
+        try {
+            const res = await fetch(`${apiBase}/notifications/send-scenario?scenario_type=${scenarioType}&messenger_type=${scenarioMessenger}`, {
+                method: 'POST'
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setScenarioStatus(`Success! Processed ${data.processed_count} messages for this scenario.`);
+            } else {
+                setScenarioStatus(`Error: ${data.detail || 'Failed'}`);
+            }
+        } catch (e) {
+            setScenarioStatus('Network Error');
+        }
+    };
+
     // --- Logic: Settings ---
     const handleUserSelect = async (user) => {
         setSelectedUser(user);
@@ -358,6 +383,12 @@ function MessagingCenter() {
                             onClick={() => setActiveSubTab('contextual')}
                         >
                             Contextual
+                        </span>
+                        <span
+                            style={{ marginLeft: '20px', cursor: 'pointer', opacity: activeSubTab === 'scenario' ? 1 : 0.5, fontWeight: 'bold', color: activeSubTab === 'scenario' ? '#818cf8' : 'inherit' }}
+                            onClick={() => setActiveSubTab('scenario')}
+                        >
+                            Scenario
                         </span>
                     </div>
 
@@ -650,6 +681,47 @@ function MessagingCenter() {
                                 </button>
                             </div>
                             {contextStatus && <div style={{ marginTop: '10px', color: '#10b981' }}>{contextStatus}</div>}
+                        </form>
+                    )}
+
+                    {activeSubTab === 'scenario' && (
+                        <form onSubmit={handleSendScenario}>
+                            <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '15px' }}>
+                                Automated business scenarios based on user lifecycle and behavior.
+                            </p>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+                                <div className="form-group">
+                                    <label>Scenario Logic</label>
+                                    <select value={scenarioType} onChange={e => setScenarioType(e.target.value)}>
+                                        <option value="unsubscribed_reminder">1. Unsubscribed Reminder (Alternate day)</option>
+                                        <option value="daily_score_update">2. Score Summary (After 2 rounds)</option>
+                                        <option value="eve_score_ranking">3. 10 PM Rank Status (Arcade/Wordly)</option>
+                                        <option value="subscription_expiry">4. Expiry Reminder (Today)</option>
+                                        <option value="inactive_subscriber">5. Inactive Subscriber (3 days ghost)</option>
+                                        <option value="daily_play_reminder">6. 10 AM Daily Reminder</option>
+                                        <option value="daily_winner_congrats">7. Daily Winner Congrats (External Ranking)</option>
+                                        <option value="daily_referral_promo">8. 12 PM Referral Promo</option>
+                                        <option value="weekly_winner_list_promo">9. 3 Days Continuous Play</option>
+                                        <option value="winning_position_warning">10. 10:30 PM Close-to-Winning Warning</option>
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Messenger Preference</label>
+                                    <select value={scenarioMessenger} onChange={e => setScenarioMessenger(e.target.value)}>
+                                        <option value="telegram">Telegram</option>
+                                        <option value="whatsapp">WhatsApp</option>
+                                        <option value="mail">Email</option>
+                                        <option value="discord">Discord</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button className="primary" type="submit" style={{ width: 'auto' }}>
+                                Trigger Scenario Now
+                            </button>
+                            {scenarioStatus && <div style={{ marginTop: '10px', color: '#10b981' }}>{scenarioStatus}</div>}
                         </form>
                     )}
                 </div>
