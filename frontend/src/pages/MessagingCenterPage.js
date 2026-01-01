@@ -585,7 +585,7 @@ function MessagingCenter() {
                                 Trigger messages based on automated business logic and user rankings.
                             </p>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.8fr', gap: '15px', marginBottom: '15px' }}>
                                 <div className="form-group">
                                     <label>Context Strategy</label>
                                     <select value={contextType} onChange={e => setContextType(e.target.value)}>
@@ -606,16 +606,17 @@ function MessagingCenter() {
                                         ))}
                                     </select>
                                 </div>
-                            </div>
 
-                            <button
-                                type="button"
-                                className="secondary"
-                                style={{ width: '100%', marginBottom: '20px', border: '1px dashed #6366f1', color: '#818cf8' }}
-                                onClick={handleSyncContextualDraft}
-                            >
-                                🔄 Sync Message Based on Context
-                            </button>
+                                <div className="form-group">
+                                    <label>Messenger Preference</label>
+                                    <select value={contextMessenger} onChange={e => setContextMessenger(e.target.value)}>
+                                        <option value="telegram">Telegram</option>
+                                        <option value="whatsapp">WhatsApp</option>
+                                        <option value="mail">Email</option>
+                                        <option value="discord">Discord</option>
+                                    </select>
+                                </div>
+                            </div>
 
                             {contextTargetSummary && (
                                 <div style={{ fontSize: '12px', color: '#94a3b8', background: '#1e293b', padding: '10px', borderRadius: '4px', marginBottom: '15px', borderLeft: '3px solid #6366f1' }}>
@@ -629,25 +630,25 @@ function MessagingCenter() {
                                     style={textAreaStyle}
                                     value={contextText}
                                     onChange={e => setContextText(e.target.value)}
-                                    placeholder="Click 'Sync Message Based on Context' or type here..."
+                                    placeholder="Click 'Sync' or type here..."
                                     required
                                 />
-                                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                                    Tip: You can use {"{total_score}"} and {"{username}"} tokens for individual messages.
-                                </div>
                             </div>
 
-                            <div className="form-group">
-                                <label>Messenger Preference</label>
-                                <select value={contextMessenger} onChange={e => setContextMessenger(e.target.value)}>
-                                    <option value="telegram">Telegram</option>
-                                    <option value="whatsapp">WhatsApp</option>
-                                    <option value="mail">Email</option>
-                                    <option value="discord">Discord</option>
-                                </select>
-                            </div>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <button
+                                    type="button"
+                                    className="secondary"
+                                    style={{ width: 'auto', border: '1px dashed #6366f1', color: '#818cf8', display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px' }}
+                                    onClick={handleSyncContextualDraft}
+                                >
+                                    🔄 Sync Draft
+                                </button>
 
-                            <button className="primary" type="submit">Send Contextual Messages</button>
+                                <button className="primary" type="submit" style={{ width: 'auto', padding: '8px 20px' }}>
+                                    Send Messages
+                                </button>
+                            </div>
                             {contextStatus && <div style={{ marginTop: '10px', color: '#10b981' }}>{contextStatus}</div>}
                         </form>
                     )}
