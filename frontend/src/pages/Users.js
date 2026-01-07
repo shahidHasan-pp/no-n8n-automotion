@@ -344,9 +344,9 @@ function Users() {
                                             <div style={{ fontSize: '12px', color: '#94a3b8' }}>{u.phone_number}</div>
                                         </td>
                                         <td>
-                                            {u.subscription_id ? (
+                                            {u.active_subscriptions_count > 0 ? (
                                                 <span style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontSize: '12px' }}>
-                                                    Active ({u.active_subscriptions_count || 1} pkg{u.active_subscriptions_count > 1 ? 's' : ''})
+                                                    Active ({u.active_subscriptions_count} pkg{u.active_subscriptions_count !== 1 ? 's' : ''})
                                                 </span>
                                             ) : (
                                                 <span style={{ color: '#94a3b8', fontSize: '12px' }}>No Subscription</span>

@@ -18,11 +18,9 @@ class User(BaseModel):
     
     # Foreign Keys
     messenger_id = Column(BigInteger, ForeignKey("messengers.id"), nullable=True)
-    subscription_id = Column(BigInteger, ForeignKey("subscriptions.id"), nullable=True)
 
     # Relationships
     messenger = relationship("Messenger", back_populates="users")
-    subscription = relationship("Subscription", back_populates="users")
     
     # Back ref for PlayedQuiz and Messages
     quizzes = relationship("PlayedQuiz", back_populates="user")

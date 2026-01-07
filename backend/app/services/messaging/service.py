@@ -246,34 +246,190 @@ class MessagingService:
         count = 0
         
         if scenario_type == MessageScenarioType.UNSUBSCRIBED_REMINDER:
-            # Scenario 1: Unsubscribed users, every alternative day from joining.
-            # Joining date is created_at. Alternative day = mod(days_since_joining, 2) == 0 (or 1)
-            # Users with NO subscription record or no active subscription
-            subquery = db.query(UserSubscribed.user_id).subquery()
-            unsub_users = db.query(User).filter(User.id.notin_(subquery)).all()
-            
-            for u in unsub_users:
-                days_since = (date.today() - u.created_at.date()).days
-                if days_since > 0 and days_since % 2 == 0:
-                    text = "আপনি এখনো কুইজার্ড/ ওয়ার্ডলি/ আরকেড রাস সার্ভিসেটিতে সাবস্ক্রিপশন করেন নি। এখনই সাবস্ক্রিপশন খেলুন এবং লুফে নিন ডেইলি, উইকলি, মেগা প্রাইজ সহ অনেক অনেক আকর্ষণীয় পুরষ্কার জেতার সুযোগ।"
-                    self.send_message(db, messenger_type, "resolve", text, user_id=u.id)
-                    count += 1
+            # Mapping from platform attribute name to PlatformType enum and display name
+            platform_info = {
+                "quizard": (PlatformType.QUIZARD, "কুইজার্ড"),
+                "wordly": (PlatformType.WORDLY, "ওয়ার্ডলি"),
+                "arcaderush": (PlatformType.ARCADERUSH, "আরকেড রাস"),
+            }
 
+            all_users = db.query(User).all()
+            
+            for user in all_users:
+                days_since = (date.today() - user.created_at.date()).days
+                if not (days_since > 0):
+                    continue
+
+                # 1. Find platforms the user is registered for
+                registered_platforms = set()
+                for platform_attr, (platform_enum, _) in platform_info.items():
+                    if getattr(user, platform_attr, False):
+                        registered_platforms.add(platform_enum)
+                
+                if not registered_platforms:
+                    continue
+
+                # 2. Find platforms the user has an active subscription for
+                subscribed_platforms = set()
+                user_subs = db.query(Subscription.platform)\
+                    .join(UserSubscribed, Subscription.id == UserSubscribed.subs_id)\
+                    .filter(UserSubscribed.user_id == user.id)\
+                    .filter(UserSubscribed.end_date >= date.today()) \
+                    .distinct().all()
+                
+                for sub in user_subs:
+                    subscribed_platforms.add(sub.platform)
+
+                # 3. Find platforms to remind the user about
+                platforms_to_remind = registered_platforms - subscribed_platforms
+                
+                # 4. Send messages
+                for platform_enum in platforms_to_remind:
+                    # Look up the platform display name from the original platform_info dict
+                    platform_display_name = ""
+                    for key, (enum_val, display_name) in platform_info.items():
+                        if enum_val == platform_enum:
+                            platform_display_name = display_name
+                            break
+                    
+                    if platform_display_name:
+                        text = f"আপনি এখনো {platform_display_name} সার্ভিসেটিতে সাবস্ক্রিপশন করেন নি। এখনই সাবস্ক্রিপশন খেলুন এবং লুফে নিন ডেইলি, উইকলি, মেগা প্রাইজ সহ অনেক অনেক আকর্ষণীয় পুরষ্কার জেতার সুযোগ।"
+                        self.send_message(db, messenger_type, "resolve", text, user_id=user.id)
+                        count += 1
+        
         elif scenario_type == MessageScenarioType.DAILY_SCORE_UPDATE:
-            # Scenario 2: After Playing two rounds of same PlayedQuiz (by name) from PlayedQuizard and Wordly, the best score.
-            # For automation, this might triggered after each quiz record or periodically.
-            # Here we just find users who played exactly 2 quizzes of same subscription today.
+            leaderboard_urls = {
+                # Quizard
+                "Ramadan Quiz Challenge": "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=34",
+                "Sports Quiz Arena": "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=75",
+                "Brain Power Quiz": "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=149",
+                "Eid Mega Tournament Quiz": "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=150",
+                # Wordly
+                "Wordly English": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=67",
+                "Wordly Bangla": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=79",
+                "Spelling Bee": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=134",
+                "Memory Match": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=151",
+                "Sudoku Easy": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=152",
+                "Sudoku Medium": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=153",
+                "SudokuHard": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=154",
+                "Sudoku Expert": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=155",
+                # Arcaderush
+                "Moto Race City": "https://arcaderush.xyz/Leaderboard/GetLeaderboard?gameName=Knife%20Madness&eventId=1001",
+                "Knife Madness": "https://arcaderush.xyz/Leaderboard/GetLeaderboard?gameName=Knife%20Madness&eventId=1002",
+                "20248 Crazy Merge": "https://arcaderush.xyz/Leaderboard/GetLeaderboard?gameName=Knife%20Madness&eventId=1003",
+            }
+            leaderboard_cache = {} # Cache for leaderboard data {url: {username: rank}}
+
+            def get_rank_from_leaderboard(url: str, username: str) -> Optional[int]:
+                if url not in leaderboard_cache:
+                    try:
+                        # response = requests.get(url, timeout=10)
+                        # response.raise_for_status()
+                        # leaderboard_data = response.json()
+
+                        # Mock data - in real implementation, this should be the actual API response
+                        # Each URL should return leaderboard for ONLY that specific game
+                        all_mock_data = {
+                            "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=153": [
+                                {
+                                    "User_Rank": 1,
+                                    "msisdn": "1628975383",
+                                    "score": 59,
+                                    "time_taken": 136,
+                                    "round_number": 1,
+                                    "date": "2026-01-07",
+                                    "event_id": 153,
+                                    "category": None,
+                                    "win": 1,
+                                    "name": "",
+                                    "username": "1628975383",
+                                    "avatar_id": None,
+                                    "avatar_img": ""
+                                },
+                            ],
+                            "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=151": [
+                                {
+                                    "User_Rank": 2,
+                                    "msisdn": "1628975383",
+                                    "score": 49,
+                                    "time_taken": 156,
+                                    "round_number": 1,
+                                    "date": "2026-01-07",
+                                    "event_id": 151,
+                                    "category": None,
+                                    "win": 1,
+                                    "name": "Ullah",
+                                    "username": "1628975383",
+                                    "avatar_id": 1,
+                                    "avatar_img": "images/20250417_180333.jpg"
+                                },
+                            ],
+                        }
+                        
+                        leaderboard_data = all_mock_data.get(url, [])
+                        
+                        rank_map = {}
+                        
+                        if "arcaderush.xyz" in url:
+                            # Arcaderush format: rank is the index + 1
+                            if isinstance(leaderboard_data, list):
+                                for i, entry in enumerate(leaderboard_data):
+                                    if isinstance(entry, dict) and "username" in entry:
+                                        leaderboard_user = entry["username"]
+                                        rank_map[leaderboard_user] = i + 1
+                        else:
+                            # Quizard/Wordly format
+                            if isinstance(leaderboard_data, list):
+                                for entry in leaderboard_data:
+                                    if isinstance(entry, dict) and "msisdn" in entry and "User_Rank" in entry:
+                                        rank_map[str(entry["msisdn"])] = entry["User_Rank"]
+                        
+                        leaderboard_cache[url] = rank_map
+                    except Exception as e:
+                        logger.error(f"Failed to fetch or parse leaderboard from {url}: {e}")
+                        leaderboard_cache[url] = {} # Don't try again
+
+                # Find the user in the cached map, handling different username formats
+                cached_map = leaderboard_cache.get(url, {})
+                
+                # Direct match
+                rank = cached_map.get(username)
+                if rank is not None:
+                    return rank
+
+                # Try matching with/without leading '0'
+                if username.startswith('0'):
+                    rank = cached_map.get(username[1:])
+                else:
+                    rank = cached_map.get('0' + username)
+                
+                return rank
+
             today = date.today()
-            round_counts = db.query(PlayedQuiz.user_id, PlayedQuiz.subs_id, func.count(PlayedQuiz.id).label('cnt'), func.max(PlayedQuiz.score).label('max_score'))\
-                .filter(func.date(PlayedQuiz.created_at) == today)\
-                .group_by(PlayedQuiz.user_id, PlayedQuiz.subs_id).having(func.count(PlayedQuiz.id) >= 2).all()
+            round_counts = db.query(
+                PlayedQuiz.user_id,
+                PlayedQuiz.subs_id,
+                func.max(PlayedQuiz.score).label('max_score')
+            ).filter(func.date(PlayedQuiz.created_at) == today)\
+             .group_by(PlayedQuiz.user_id, PlayedQuiz.subs_id)\
+             .having(func.count(PlayedQuiz.id) >= 2).all()
             
             for r in round_counts:
-                # Filter for PlayedQuizard and Wordly platforms
+                user = db.query(User).filter(User.id == r.user_id).first()
                 sub = db.query(Subscription).filter(Subscription.id == r.subs_id).first()
-                if sub and sub.platform in [PlatformType.QUIZARD, PlatformType.WORDLY]:
-                    text = f"আপনার আজকের দুটি রাউন্ড সফল ভাবে সম্পন্ন হয়েছে। আজকে আপনার সর্বোচ্চ স্কোর “{r.max_score}”"
-                    self.send_message(db, messenger_type, "resolve", text, user_id=r.user_id)
+
+                if not (user and sub and sub.name in leaderboard_urls):
+                    continue
+                
+                game_name = sub.name
+                max_score = r.max_score
+                url = leaderboard_urls[game_name]
+                
+                rank = get_rank_from_leaderboard(url, user.username)
+
+                if rank is not None:
+                    text = f"আজকে আপনি {game_name} গেমটি খেলেছেন এবং এখন পর্যন্ত আপনার সর্বোচ্চ স্কোর {max_score}। আপনি লিডারবোর্ডে {rank} তম অবস্থানে রয়েছেন।"
+                    self.send_message(db, messenger_type, "resolve", text, user_id=user.id)
                     count += 1
 
         elif scenario_type == MessageScenarioType.EVE_SCORE_RANKING:

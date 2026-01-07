@@ -149,8 +149,7 @@ def link_user_subscription(
         )
         existing_link = crud.user_subscribed.create(db, obj_in=internal_link_in)
     
-    # Also update the user's primary subscription_id and platform flags
-    user.subscription_id = subscription.id
+    # Also update the user's platform registration flags
     if subscription.platform == models.enums.PlatformType.QUIZARD:
         user.quizard = True
     elif subscription.platform == models.enums.PlatformType.WORDLY:

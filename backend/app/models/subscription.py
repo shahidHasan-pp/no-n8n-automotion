@@ -21,6 +21,3 @@ class Subscription(BaseModel):
     
     start_date = Column(DateTime(timezone=True), nullable=True)
     end_date = Column(DateTime(timezone=True), nullable=True)
-    
-    # Relationships
-    users = relationship("User", back_populates="subscription") 

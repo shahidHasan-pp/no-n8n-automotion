@@ -107,23 +107,25 @@ def send_bulk_notifications(
     """
     Send bulk notifications filtered by subscription status or specific subscription.
     """
-    from app.crud import user as user_crud
-    
-    # Re-use user_crud.get_with_filters but we might need to add subscription_id filtering support to it,
-    # or just query here. For simplicity, let's query here or update CRUD.
-    # To avoid changing CRUD repeatedly, let's just query efficiently here.
-    
     from app.models.user import User
+    from app.models.quiz import UserSubscribed
+    from sqlalchemy import exists
+
     query = db.query(User)
     
     if has_subscription is not None:
-         if has_subscription:
-            query = query.filter(User.subscription_id.isnot(None))
-         else:
-            query = query.filter(User.subscription_id.is_(None))
+        if has_subscription:
+            query = query.filter(exists().where(UserSubscribed.user_id == User.id))
+        else:
+            query = query.filter(~exists().where(UserSubscribed.user_id == User.id))
             
     if subscription_id:
-        query = query.filter(User.subscription_id == subscription_id)
+        query = query.filter(
+            exists().where(
+                (UserSubscribed.user_id == User.id) &
+                (UserSubscribed.subs_id == subscription_id)
+            )
+        )
         
     users = query.all()
     count = 0

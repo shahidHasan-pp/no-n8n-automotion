@@ -57,10 +57,6 @@ class SubscriptionService:
         )
         user_sub = user_sup_crud.create(db, obj_in=user_sub_in)
         
-        # 5. Update user's subscription_id field
-        user.subscription_id = sub.id
-        db.add(user)
-        
         # 6. Increment Subscription Quantity
         sub.current_subs_quantity += 1
         db.add(sub)

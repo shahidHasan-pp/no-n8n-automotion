@@ -28,13 +28,11 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     messenger_id: Optional[int] = None
-    subscription_id: Optional[int] = None
     # Optionally accept creating messenger/subscription inline, but for now keep it simple via IDs or update later.
 
 class UserUpdate(UserBase):
     password: Optional[str] = None # Not handling auth yet, but standard pattern.
     messenger_id: Optional[int] = None
-    subscription_id: Optional[int] = None
 
 class UserCheck(BaseModel):
     username: str
@@ -45,9 +43,7 @@ class UserPlatformUpdate(BaseModel):
 
 class User(UserBase, BaseSchema):
     messenger_id: Optional[int] = None
-    subscription_id: Optional[int] = None
     messenger: Optional[Messenger] = None
-    subscription: Optional[Subscription] = None
     active_subscriptions_count: int = 0  # Count of active subscriptions from user_subscribed table
     
     class Config:

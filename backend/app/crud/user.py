@@ -29,10 +29,9 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         has_subscription: Optional[bool] = None,
         has_messages: Optional[bool] = None
     ) -> List[User]:
-        # Eagerly load messenger and subscription relationships
+        # Eagerly load messenger relationship
         query = db.query(User).options(
-            joinedload(User.messenger),
-            joinedload(User.subscription)
+            joinedload(User.messenger)
         )
         
         if search:
@@ -60,10 +59,10 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
                 query = query.filter((User.arcaderush == False) | (User.arcaderush.is_(None)))
         
         if has_subscription is not None:
-             if has_subscription:
-                query = query.filter(User.subscription_id.isnot(None))
-             else:
-                query = query.filter(User.subscription_id.is_(None))
+            if has_subscription:
+                query = query.filter(exists().where(UserSubscribed.user_id == User.id))
+            else:
+                query = query.filter(~exists().where(UserSubscribed.user_id == User.id))
                 
         if has_messages is not None:
             if has_messages:
