@@ -9,7 +9,10 @@ function Users() {
         username: '',
         email: '',
         full_name: '',
-        phone_number: ''
+        phone_number: '',
+        quizard: false,
+        wordly: false,
+        arcaderush: false
     });
 
     const [editingUser, setEditingUser] = useState(null);
@@ -19,13 +22,14 @@ function Users() {
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterSubscription, setFilterSubscription] = useState('all'); // 'all', 'subscribed', 'unsubscribed', 'has_messages'
+    const [filterPlatform, setFilterPlatform] = useState('all');
     const [totalUsers, setTotalUsers] = useState(0);
 
     const apiBase = API_BASE_URL;
 
     useEffect(() => {
         fetchUsers();
-    }, [currentPage, searchTerm, filterSubscription, itemsPerPage]);
+    }, [currentPage, searchTerm, filterSubscription, filterPlatform, itemsPerPage]);
 
     const fetchUsers = async () => {
         try {
@@ -46,6 +50,14 @@ function Users() {
                 url += '&has_messages=true';
             }
 
+            if (filterPlatform === 'quizard') {
+                url += '&quizard=true';
+            } else if (filterPlatform === 'wordly') {
+                url += '&wordly=true';
+            } else if (filterPlatform === 'arcaderush') {
+                url += '&arcaderush=true';
+            }
+
             const response = await fetch(url);
             const data = await response.json();
             setUsers(data);
@@ -57,11 +69,19 @@ function Users() {
     };
 
     const handleInputChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value, type, checked } = e.target;
+        setFormData({
+            ...formData,
+            [name]: type === 'checkbox' ? checked : value
+        });
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!formData.username) {
+            alert("Username is required");
+            return;
+        }
         try {
             const response = await fetch(`${apiBase}/users/`, {
                 method: "POST",
@@ -71,10 +91,19 @@ function Users() {
             if (response.ok) {
                 // Simple success feedback, could be a toast in real app
                 fetchUsers();
-                setFormData({ username: '', email: '', full_name: '', phone_number: '' });
+                setFormData({
+                    username: '', email: '', full_name: '', phone_number: '',
+                    quizard: false, wordly: false, arcaderush: false
+                });
             } else {
                 const err = await response.json();
-                alert("Error: " + JSON.stringify(err));
+                let msg = "Error: ";
+                if (err.detail) {
+                    msg += typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail);
+                } else {
+                    msg += JSON.stringify(err);
+                }
+                alert(msg);
             }
         } catch (error) {
             console.error("Error creating user:", error);
@@ -87,13 +116,19 @@ function Users() {
             username: user.username,
             email: user.email,
             full_name: user.full_name || '',
-            phone_number: user.phone_number || ''
+            phone_number: user.phone_number || '',
+            quizard: user.quizard || false,
+            wordly: user.wordly || false,
+            arcaderush: user.arcaderush || false
         });
     };
 
     const cancelEdit = () => {
         setEditingUser(null);
-        setFormData({ username: '', email: '', full_name: '', phone_number: '' });
+        setFormData({
+            username: '', email: '', full_name: '', phone_number: '',
+            quizard: false, wordly: false, arcaderush: false
+        });
     };
 
     const handleUpdate = async (e) => {
@@ -110,7 +145,13 @@ function Users() {
                 cancelEdit();
             } else {
                 const err = await response.json();
-                alert("Error: " + JSON.stringify(err));
+                let msg = "Error: ";
+                if (err.detail) {
+                    msg += typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail);
+                } else {
+                    msg += JSON.stringify(err);
+                }
+                alert(msg);
             }
         } catch (e) { console.error(e) }
     };
@@ -163,16 +204,32 @@ function Users() {
                     </h3>
                     <form onSubmit={editingUser ? handleUpdate : handleSubmit}>
                         <label style={{ fontSize: '12px', color: '#94a3b8' }}>Full Name</label>
-                        <input name="full_name" value={formData.full_name} onChange={handleInputChange} required />
+                        <input name="full_name" value={formData.full_name} onChange={handleInputChange} />
 
                         <label style={{ fontSize: '12px', color: '#94a3b8' }}>Username</label>
                         <input name="username" value={formData.username} onChange={handleInputChange} required />
 
                         <label style={{ fontSize: '12px', color: '#94a3b8' }}>Email</label>
-                        <input name="email" type="email" value={formData.email} onChange={handleInputChange} required />
+                        <input name="email" type="text" value={formData.email} onChange={handleInputChange} />
 
                         <label style={{ fontSize: '12px', color: '#94a3b8' }}>Phone (Optional)</label>
                         <input name="phone_number" value={formData.phone_number} onChange={handleInputChange} />
+
+                        <label style={{ fontSize: '12px', color: '#94a3b8' }}>Platforms</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                            <label style={{ fontSize: '12px', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                                <input type="checkbox" name="quizard" checked={formData.quizard} onChange={handleInputChange} />
+                                Quizard
+                            </label>
+                            <label style={{ fontSize: '12px', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                                <input type="checkbox" name="wordly" checked={formData.wordly} onChange={handleInputChange} />
+                                Wordly
+                            </label>
+                            <label style={{ fontSize: '12px', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                                <input type="checkbox" name="arcaderush" checked={formData.arcaderush} onChange={handleInputChange} />
+                                ArcadeRush
+                            </label>
+                        </div>
 
                         <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                             <button type="submit" style={{ flex: 1 }}>
@@ -192,7 +249,7 @@ function Users() {
                     <h3 style={{ fontSize: '18px', marginBottom: '15px' }}>Directory</h3>
 
                     {/* Search and Filter */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                         <input
                             type="text"
                             placeholder="🔍 Search by name, username, or email..."
@@ -230,6 +287,26 @@ function Users() {
                             <option value="unsubscribed">No Subscription</option>
                             <option value="has_messages">Has Messages</option>
                         </select>
+                        <select
+                            value={filterPlatform}
+                            onChange={(e) => {
+                                setFilterPlatform(e.target.value);
+                                setCurrentPage(1);
+                            }}
+                            style={{
+                                padding: '10px 14px',
+                                background: '#1e293b',
+                                border: '1px solid #334155',
+                                borderRadius: '6px',
+                                color: '#f8fafc',
+                                fontSize: '14px'
+                            }}
+                        >
+                            <option value="all">All Platforms</option>
+                            <option value="quizard">Quizard</option>
+                            <option value="wordly">Wordly</option>
+                            <option value="arcaderush">ArcadeRush</option>
+                        </select>
                     </div>
 
                     <div style={{ overflowX: 'auto' }}>
@@ -247,7 +324,20 @@ function Users() {
                                     <tr key={u.id}>
                                         <td>
                                             <div style={{ fontWeight: '500', color: '#f8fafc' }}>{u.full_name}</div>
-                                            <div style={{ fontSize: '12px', color: '#6366f1' }}>@{u.username}</div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                <span style={{ fontSize: '12px', color: '#6366f1' }}>@{u.username}</span>
+                                                <div style={{ display: 'flex', gap: '4px' }}>
+                                                    {u.quizard && (
+                                                        <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(99, 102, 241, 0.2)', color: '#818cf8' }}>Q</span>
+                                                    )}
+                                                    {u.wordly && (
+                                                        <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(16, 185, 129, 0.2)', color: '#10b981' }}>W</span>
+                                                    )}
+                                                    {u.arcaderush && (
+                                                        <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(236, 72, 153, 0.2)', color: '#ec4899' }}>A</span>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </td>
                                         <td>
                                             <div style={{ fontSize: '13px' }}>{u.email}</div>

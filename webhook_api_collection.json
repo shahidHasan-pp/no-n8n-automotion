@@ -125,6 +125,66 @@
                 "description": "Links a user to a subscription using username and subscription name."
             },
             "response": []
+        },
+        {
+            "name": "Check User",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"username\": \"test_user\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/v1/webhook/check-user",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "api",
+                        "v1",
+                        "webhook",
+                        "check-user"
+                    ]
+                },
+                "description": "Checks if a username exists and returns their platform registration status."
+            },
+            "response": []
+        },
+        {
+            "name": "Register Platform",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"username\": \"test_user\",\n    \"platform\": \"quizard\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/v1/webhook/register-platform",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "api",
+                        "v1",
+                        "webhook",
+                        "register-platform"
+                    ]
+                },
+                "description": "Registers an existing user to a specific platform."
+            },
+            "response": []
         }
     ],
     "variable": [

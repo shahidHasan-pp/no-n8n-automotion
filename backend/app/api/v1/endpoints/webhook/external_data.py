@@ -38,20 +38,6 @@ def sync_user(
         user = crud.user.create(db, obj_in=user_in)
         logger.info(f"Created new user: {user.username}")
     
-    # Ensure Messenger profile exists
-    if not user.messenger_id:
-        messenger_profile = crud.messenger.create(db, obj_in={
-            "mail": {},
-            "telegram": {},
-            "whatsapp": {},
-            "discord": {}
-        })
-        user.messenger_id = messenger_profile.id
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        logger.info(f"Initialized messenger profile for user: {user.username}")
-    
     return user
 
 @router.post("/sync-subscription", response_model=schemas.Subscription)
@@ -89,7 +75,7 @@ def list_subscriptions(
     """
     return crud.subscription.get_multi(db, skip=skip, limit=limit)
 
-@router.post("/record-quiz", response_model=schemas.Quiz)
+@router.post("/record-quiz", response_model=schemas.PlayedQuiz)
 def record_quiz(
     *,
     db: Session = Depends(deps.get_db),
@@ -109,7 +95,7 @@ def record_quiz(
         raise HTTPException(status_code=404, detail=f"Subscription '{quiz_in.subs}' not found")
             
     # Prepare internal create object
-    internal_quiz_in = schemas.QuizCreate(
+    internal_quiz_in = schemas.PlayedQuizCreate(
         user_id=user.id,
         subs_id=subscription.id,
         score=quiz_in.score,
@@ -163,11 +149,69 @@ def link_user_subscription(
         )
         existing_link = crud.user_subscribed.create(db, obj_in=internal_link_in)
     
-    # Also update the user's primary subscription_id for easier access
+    # Also update the user's primary subscription_id and platform flags
     user.subscription_id = subscription.id
+    if subscription.platform == models.enums.PlatformType.QUIZARD:
+        user.quizard = True
+    elif subscription.platform == models.enums.PlatformType.WORDLY:
+        user.wordly = True
+    elif subscription.platform == models.enums.PlatformType.ARCADERUSH:
+        user.arcaderush = True
     db.add(user)
     db.commit()
     db.refresh(existing_link)
     
     logger.info(f"Linked user {user.username} to subscription {subscription.name}")
     return existing_link
+
+@router.post("/check-user")
+def check_user(
+    *,
+    db: Session = Depends(deps.get_db),
+    check_in: schemas.UserCheck
+) -> Any:
+    """
+    Check if a username exists and return their platform registration status.
+    """
+    user = crud.user.get_by_username(db, username=check_in.username)
+    if not user:
+        return {"exists": False}
+    
+    return {
+        "exists": True,
+        "username": user.username,
+        "platforms": {
+            "quizard": user.quizard,
+            "wordly": user.wordly,
+            "arcaderush": user.arcaderush
+        }
+    }
+
+@router.post("/register-platform", response_model=schemas.User)
+def register_platform(
+    *,
+    db: Session = Depends(deps.get_db),
+    update_in: schemas.UserPlatformUpdate
+) -> Any:
+    """
+    Register an existing user to a specific platform.
+    """
+    user = crud.user.get_by_username(db, username=update_in.username)
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User '{update_in.username}' not found")
+
+    platform = update_in.platform.lower()
+    if platform == "quizard":
+        user.quizard = True
+    elif platform == "wordly":
+        user.wordly = True
+    elif platform == "arcaderush":
+        user.arcaderush = True
+    else:
+        raise HTTPException(status_code=400, detail=f"Invalid platform '{platform}'. Must be one of: quizard, wordly, arcaderush")
+    
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    logger.info(f"Registered user {user.username} to platform {platform}")
+    return user

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from app.models.enums import MessengerType, NotificationContextType, MessageScenarioType, PlatformType
 from app.models.user import User
-from app.models.quiz import Quiz, UserSubscribed
+from app.models.quiz import PlayedQuiz, UserSubscribed
 from app.models.subscription import Subscription
 from app.core.config import settings
 from app.crud import message as message_crud
@@ -104,10 +104,10 @@ class MessagingService:
 
         if context_type == NotificationContextType.TOP_RANKERS:
             draft = f"🏆 Congratulations! You are among the top rankers in {package_name}! Your total score is {{total_score}}."
-            query = db.query(User.username).join(Quiz, User.id == Quiz.user_id)
+            query = db.query(User.username).join(PlayedQuiz, User.id == PlayedQuiz.user_id)
             if subscription_id:
-                query = query.filter(Quiz.subs_id == subscription_id)
-            top_players = query.group_by(User.id).order_by(func.sum(Quiz.score).desc()).limit(3).all()
+                query = query.filter(PlayedQuiz.subs_id == subscription_id)
+            top_players = query.group_by(User.id).order_by(func.sum(PlayedQuiz.score).desc()).limit(3).all()
             names = ", ".join([p.username for p in top_players])
             target_summary = f"Targets top 3 players: {names}"
 
@@ -124,10 +124,10 @@ class MessagingService:
             target_summary = "Broadcast to the configured community channel."
 
         elif context_type == NotificationContextType.CHANNEL_CONGRATS_TOP_5:
-            query = db.query(User.username).join(Quiz, User.id == Quiz.user_id)
+            query = db.query(User.username).join(PlayedQuiz, User.id == PlayedQuiz.user_id)
             if subscription_id:
-                query = query.filter(Quiz.subs_id == subscription_id)
-            top_5 = query.group_by(User.id).order_by(func.sum(Quiz.score).desc()).limit(5).all()
+                query = query.filter(PlayedQuiz.subs_id == subscription_id)
+            top_5 = query.group_by(User.id).order_by(func.sum(PlayedQuiz.score).desc()).limit(5).all()
             names = ", ".join([f"@{p.username}" for p in top_5])
             draft = f"🎉 Huge congratulations to our Top 5 players in {package_name}: {names}! Amazing job! 🥳"
             target_summary = "Broadcast to the configured community channel."
@@ -151,13 +151,13 @@ class MessagingService:
                 package_name = sub.name
         
         if context_type == NotificationContextType.TOP_RANKERS:
-            query = db.query(User.id, User.username, func.sum(Quiz.score).label('total_score'))\
-                .join(Quiz, User.id == Quiz.user_id)
+            query = db.query(User.id, User.username, func.sum(PlayedQuiz.score).label('total_score'))\
+                .join(PlayedQuiz, User.id == PlayedQuiz.user_id)
             
             if subscription_id:
-                query = query.filter(Quiz.subs_id == subscription_id)
+                query = query.filter(PlayedQuiz.subs_id == subscription_id)
             
-            top_players = query.group_by(User.id).order_by(func.sum(Quiz.score).desc()).limit(3).all()
+            top_players = query.group_by(User.id).order_by(func.sum(PlayedQuiz.score).desc()).limit(3).all()
             
             for i, p in enumerate(top_players):
                 if custom_text:
@@ -177,12 +177,12 @@ class MessagingService:
                 count += 1
 
         elif context_type == NotificationContextType.INSPIRING_TOP_10_30:
-            sub_query = db.query(User.id, User.username, func.sum(Quiz.score).label('total_score'))\
-                .join(Quiz, User.id == Quiz.user_id)
+            sub_query = db.query(User.id, User.username, func.sum(PlayedQuiz.score).label('total_score'))\
+                .join(PlayedQuiz, User.id == PlayedQuiz.user_id)
             if subscription_id:
-                sub_query = sub_query.filter(Quiz.subs_id == subscription_id)
+                sub_query = sub_query.filter(PlayedQuiz.subs_id == subscription_id)
             
-            targets = sub_query.group_by(User.id).order_by(func.sum(Quiz.score).desc()).offset(9).limit(21).all()
+            targets = sub_query.group_by(User.id).order_by(func.sum(PlayedQuiz.score).desc()).offset(9).limit(21).all()
             
             for p in targets:
                 if custom_text:
@@ -199,7 +199,7 @@ class MessagingService:
             if subscription_id:
                 sub_users_query = sub_users_query.filter(UserSubscribed.subs_id == subscription_id)
             
-            played_today = db.query(Quiz.user_id).filter(func.date(Quiz.created_at) == date.today()).subquery()
+            played_today = db.query(PlayedQuiz.user_id).filter(func.date(PlayedQuiz.created_at) == date.today()).subquery()
             users_to_remind = sub_users_query.filter(User.id.notin_(played_today)).all()
             
             for u in users_to_remind:
@@ -225,10 +225,10 @@ class MessagingService:
                 if custom_text:
                     text = custom_text.replace("{package_name}", package_name)
                 else:
-                    query = db.query(User.username).join(Quiz, User.id == Quiz.user_id)
+                    query = db.query(User.username).join(PlayedQuiz, User.id == PlayedQuiz.user_id)
                     if subscription_id:
-                        query = query.filter(Quiz.subs_id == subscription_id)
-                    top_5 = query.group_by(User.id).order_by(func.sum(Quiz.score).desc()).limit(5).all()
+                        query = query.filter(PlayedQuiz.subs_id == subscription_id)
+                    top_5 = query.group_by(User.id).order_by(func.sum(PlayedQuiz.score).desc()).limit(5).all()
                     names = ", ".join([f"@{p.username}" for p in top_5])
                     text = f"🎉 Huge congratulations to our Top 5 players in {package_name}: {names}! Amazing job! 🥳"
                 
@@ -260,16 +260,16 @@ class MessagingService:
                     count += 1
 
         elif scenario_type == MessageScenarioType.DAILY_SCORE_UPDATE:
-            # Scenario 2: After Playing two rounds of same Quiz (by name) from Quizard and Wordly, the best score.
+            # Scenario 2: After Playing two rounds of same PlayedQuiz (by name) from PlayedQuizard and Wordly, the best score.
             # For automation, this might triggered after each quiz record or periodically.
             # Here we just find users who played exactly 2 quizzes of same subscription today.
             today = date.today()
-            round_counts = db.query(Quiz.user_id, Quiz.subs_id, func.count(Quiz.id).label('cnt'), func.max(Quiz.score).label('max_score'))\
-                .filter(func.date(Quiz.created_at) == today)\
-                .group_by(Quiz.user_id, Quiz.subs_id).having(func.count(Quiz.id) >= 2).all()
+            round_counts = db.query(PlayedQuiz.user_id, PlayedQuiz.subs_id, func.count(PlayedQuiz.id).label('cnt'), func.max(PlayedQuiz.score).label('max_score'))\
+                .filter(func.date(PlayedQuiz.created_at) == today)\
+                .group_by(PlayedQuiz.user_id, PlayedQuiz.subs_id).having(func.count(PlayedQuiz.id) >= 2).all()
             
             for r in round_counts:
-                # Filter for Quizard and Wordly platforms
+                # Filter for PlayedQuizard and Wordly platforms
                 sub = db.query(Subscription).filter(Subscription.id == r.subs_id).first()
                 if sub and sub.platform in [PlatformType.QUIZARD, PlatformType.WORDLY]:
                     text = f"আপনার আজকের দুটি রাউন্ড সফল ভাবে সম্পন্ন হয়েছে। আজকে আপনার সর্বোচ্চ স্কোর “{r.max_score}”"
@@ -278,11 +278,11 @@ class MessagingService:
 
         elif scenario_type == MessageScenarioType.EVE_SCORE_RANKING:
             # Scenario 3: At 10 pm to users who played ArcadeRush or Sudoko from Wordly.
-            # Sudoko is probably a subscription name or type. Assuming name check for now.
-            query = db.query(User.id, Subscription.id.label('subs_id'), Subscription.name, func.max(Quiz.score).label('max_score'))\
-                .join(Quiz, User.id == Quiz.user_id)\
-                .join(Subscription, Quiz.subs_id == Subscription.id)\
-                .filter(func.date(Quiz.created_at) == date.today())\
+            # Sudoko is a subscription name. Assuming name check for now.
+            query = db.query(User.id, Subscription.id.label('subs_id'), Subscription.name, func.max(PlayedQuiz.score).label('max_score'))\
+                .join(PlayedQuiz, User.id == PlayedQuiz.user_id)\
+                .join(Subscription, PlayedQuiz.subs_id == Subscription.id)\
+                .filter(func.date(PlayedQuiz.created_at) == date.today())\
                 .filter(Subscription.platform == PlatformType.ARCADERUSH)
             
             # This needs rank calculation.
@@ -291,11 +291,11 @@ class MessagingService:
                 # Calculate rank relative to others in same subscription today
                 rank = db.query(func.count(User.id))\
                     .select_from(User)\
-                    .join(Quiz, User.id == Quiz.user_id)\
-                    .filter(Quiz.subs_id == r.subs_id)\
-                    .filter(func.date(Quiz.created_at) == date.today())\
+                    .join(PlayedQuiz, User.id == PlayedQuiz.user_id)\
+                    .filter(PlayedQuiz.subs_id == r.subs_id)\
+                    .filter(func.date(PlayedQuiz.created_at) == date.today())\
                     .group_by(User.id)\
-                    .having(func.max(Quiz.score) > r.max_score).count() + 1
+                    .having(func.max(PlayedQuiz.score) > r.max_score).count() + 1
                 
                 text = f"আজকে আপনি “{r.name}” গেমটি খেলেছেন এবং এখন পর্যন্ত আপনার সর্বোচ্চ স্কোর “{r.max_score}“। আপনি লিডারবোর্ডে “{rank}“ তম অবস্থানে রয়েছেন।"
                 self.send_message(db, messenger_type, "resolve", text, user_id=r.id)
@@ -317,7 +317,7 @@ class MessagingService:
             # Users with active subscriptions
             active_subs = db.query(UserSubscribed.user_id).distinct().subquery()
             # Users who played in last 3 days
-            played_recently = db.query(Quiz.user_id).filter(func.date(Quiz.created_at) >= three_days_ago).distinct().subquery()
+            played_recently = db.query(PlayedQuiz.user_id).filter(func.date(PlayedQuiz.created_at) >= three_days_ago).distinct().subquery()
             
             inactive_users = db.query(User).filter(User.id.in_(active_subs)).filter(User.id.notin_(played_recently)).all()
             for u in inactive_users:
@@ -329,7 +329,7 @@ class MessagingService:
             # Scenario 6: 10 AM reminder to subscribed users who didn't play today.
             today = date.today()
             active_subs = db.query(UserSubscribed.user_id).distinct().subquery()
-            played_today = db.query(Quiz.user_id).filter(func.date(Quiz.created_at) == today).distinct().subquery()
+            played_today = db.query(PlayedQuiz.user_id).filter(func.date(PlayedQuiz.created_at) == today).distinct().subquery()
             
             to_remind = db.query(User).filter(User.id.in_(active_subs)).filter(User.id.notin_(played_today)).all()
             for u in to_remind:
@@ -343,7 +343,20 @@ class MessagingService:
                 rank_data = requests.get("https://cms.quizard.live/money/weeklyWinnerByUserNData/").json()
                 # Assuming JSON structure has a list of winners
                 # Logic: Find winners with serial_no and link to our users by username/msisdn
+                rank_data = [
+                    {"msisdn": "1681791286", "points": 950, "rank": 1, "serial_no": 1},
+                    {"msisdn": "1962401320", "points": 880, "rank": 2, "serial_no": 2},
+                    {"msisdn": "1910194688", "points": 810, "rank": 3, "serial_no": 3},
+                ]
+
+                
+                #make this loop enumerate from serial_no 1 to 50
                 for item in rank_data:
+                    serial_no = item.get("serial_no")
+
+                    if serial_no > 50:
+                        break
+
                     username = item.get("msisdn")
                     if username:
                         user = db.query(User).filter(User.username == username).first()
@@ -365,14 +378,14 @@ class MessagingService:
         elif scenario_type == MessageScenarioType.WEEKLY_WINNER_LIST_PROMO:
             # Scenario 9: 3 days continuous play.
             three_days_ago = date.today() - timedelta(days=2) # inclusive
-            continuous = db.query(Quiz.user_id)\
-                .filter(func.date(Quiz.created_at) >= three_days_ago)\
-                .group_by(Quiz.user_id, func.date(Quiz.created_at))\
+            continuous = db.query(PlayedQuiz.user_id)\
+                .filter(func.date(PlayedQuiz.created_at) >= three_days_ago)\
+                .group_by(PlayedQuiz.user_id, func.date(PlayedQuiz.created_at))\
                 .subquery()
             
             # Count distinct days in last 3 days per user
-            streak_users = db.query(Quiz.user_id).filter(func.date(Quiz.created_at) >= three_days_ago)\
-                .group_by(Quiz.user_id).having(func.count(func.distinct(func.date(Quiz.created_at))) >= 3).all()
+            streak_users = db.query(PlayedQuiz.user_id).filter(func.date(PlayedQuiz.created_at) >= three_days_ago)\
+                .group_by(PlayedQuiz.user_id).having(func.count(func.distinct(func.date(PlayedQuiz.created_at))) >= 3).all()
             
             for u in streak_users:
                 text = "আপনি সাপ্তাহিক উইনার হওয়ার তালিকায় রয়েছেন। অভিনন্দন! এভাবেই বেশি বেশি স্কোর করে যান। আপনার জন্য অপেক্ষা করছে সাপ্তাহিক পুরষ্কার !"
@@ -383,21 +396,21 @@ class MessagingService:
             # Scenario 10: 10:30 PM ArcadeRush or Wordly-Sudoko - Close to winning.
             # Similar to scenario 3 but different message
             # For brevity, let's look for users in rank 6-15 (assuming top 5 win)
-            query = db.query(User.id, Subscription.id.label('subs_id'), Subscription.name, func.max(Quiz.score).label('max_score'))\
-                .join(Quiz, User.id == Quiz.user_id)\
-                .join(Subscription, Quiz.subs_id == Subscription.id)\
-                .filter(func.date(Quiz.created_at) == date.today())\
+            query = db.query(User.id, Subscription.id.label('subs_id'), Subscription.name, func.max(PlayedQuiz.score).label('max_score'))\
+                .join(PlayedQuiz, User.id == PlayedQuiz.user_id)\
+                .join(Subscription, PlayedQuiz.subs_id == Subscription.id)\
+                .filter(func.date(PlayedQuiz.created_at) == date.today())\
                 .filter(Subscription.platform == PlatformType.ARCADERUSH)
             
             results = query.group_by(User.id, Subscription.id, Subscription.name).all()
             for r in results:
                 rank = db.query(func.count(User.id))\
                     .select_from(User)\
-                    .join(Quiz, User.id == Quiz.user_id)\
-                    .filter(Quiz.subs_id == r.subs_id)\
-                    .filter(func.date(Quiz.created_at) == date.today())\
+                    .join(PlayedQuiz, User.id == PlayedQuiz.user_id)\
+                    .filter(PlayedQuiz.subs_id == r.subs_id)\
+                    .filter(func.date(PlayedQuiz.created_at) == date.today())\
                     .group_by(User.id)\
-                    .having(func.max(Quiz.score) > r.max_score).count() + 1
+                    .having(func.max(PlayedQuiz.score) > r.max_score).count() + 1
                 
                 if 5 < rank <= 20: # Example "close to winning" range
                     text = f"ইতিমধ্যে জেনেছেন “{r.name}” গেমের লিডারবোর্ডে আপনার অবস্থান “{rank}“ তম। এই অবস্থানে আজকের ডেইলি প্রাইজ পাওয়া সম্ভব হবে না। দয়া করে আরেকটু চেষ্টা করুন। রাত ১১.৫৯ এর মধ্যে “ 5 “ তম অবস্থানের ভিতরে থাকলেই পেয়ে যাবেন ডেইলি প্রাইজ।"

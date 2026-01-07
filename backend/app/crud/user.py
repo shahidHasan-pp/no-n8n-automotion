@@ -6,6 +6,7 @@ from app.crud.base import CRUDBase
 from app.models.user import User
 from app.models.messenger import Message, Messenger
 from app.models.quiz import UserSubscribed
+from app.models.enums import PlatformType
 from app.schemas.user import UserCreate, UserUpdate
 
 class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
@@ -22,6 +23,9 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         skip: int = 0, 
         limit: int = 100, 
         search: Optional[str] = None,
+        quizard: Optional[bool] = None,
+        wordly: Optional[bool] = None,
+        arcaderush: Optional[bool] = None,
         has_subscription: Optional[bool] = None,
         has_messages: Optional[bool] = None
     ) -> List[User]:
@@ -38,6 +42,22 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
                 (User.email.like(search_pattern)) |
                 (User.full_name.like(search_pattern))
             )
+        
+        if quizard is not None:
+            if quizard:
+                query = query.filter(User.quizard == True)
+            else:
+                query = query.filter((User.quizard == False) | (User.quizard.is_(None)))
+        if wordly is not None:
+            if wordly:
+                query = query.filter(User.wordly == True)
+            else:
+                query = query.filter((User.wordly == False) | (User.wordly.is_(None)))
+        if arcaderush is not None:
+            if arcaderush:
+                query = query.filter(User.arcaderush == True)
+            else:
+                query = query.filter((User.arcaderush == False) | (User.arcaderush.is_(None)))
         
         if has_subscription is not None:
              if has_subscription:
