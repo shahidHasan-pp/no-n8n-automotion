@@ -46,7 +46,7 @@ function UserDetail() {
             }
 
             // Fetch user subscriptions
-            const subsRes = await fetch(`${apiBase}/quizzes/user/${userId}/subscriptions`);
+            const subsRes = await fetch(`${apiBase}/user-subscription/user/${userId}/subscriptions`);
             if (subsRes.ok) {
                 const userSubs = await subsRes.json();
                 setSubscriptions(userSubs);

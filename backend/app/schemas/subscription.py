@@ -19,6 +19,12 @@ class SubscriptionBase(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
 
+    @validator('remark', pre=True)
+    def default_remark_if_none(cls, v):
+        if v is None:
+            return []
+        return v
+
     @validator('type', pre=True)
     def upper_case_type(cls, v):
         if isinstance(v, str):
@@ -45,3 +51,9 @@ class SubscriptionUpdate(SubscriptionBase):
 
 class Subscription(SubscriptionBase, BaseSchema):
     current_subs_quantity: int = 0
+    
+    @validator('current_subs_quantity', pre=True)
+    def default_subs_quantity_if_none(cls, v):
+        if v is None:
+            return 0
+        return v
