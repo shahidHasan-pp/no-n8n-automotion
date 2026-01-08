@@ -33,7 +33,7 @@ function Quizzes() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${apiBase}/quizzes/subscribe`, {
+            const res = await fetch(`${apiBase}/user-subscription/subscribe`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(formData)

@@ -33,6 +33,19 @@ function MessagingCenter() {
     const [channelLink, setChannelLink] = useState('');
     const [channelStatus, setChannelStatus] = useState(null);
 
+    // --- State: Send Contextual ---
+    const [contextType, setContextType] = useState('top_rankers');
+    const [contextMessenger, setContextMessenger] = useState('telegram');
+    const [contextSubId, setContextSubId] = useState('all');
+    const [contextText, setContextText] = useState('');
+    const [contextTargetSummary, setContextTargetSummary] = useState('');
+    const [contextStatus, setContextStatus] = useState(null);
+
+    // --- State: Send Scenario ---
+    const [scenarioType, setScenarioType] = useState('unsubscribed_reminder');
+    const [scenarioMessenger, setScenarioMessenger] = useState('telegram');
+    const [scenarioStatus, setScenarioStatus] = useState(null);
+
     // --- State: Shared/Data ---
     const [users, setUsers] = useState([]);
     const [subscriptions, setSubscriptions] = useState([]);
@@ -175,6 +188,74 @@ function MessagingCenter() {
         }
     };
 
+    // --- Logic: Send Contextual ---
+    const handleSyncContextualDraft = async () => {
+        setContextStatus('fetching draft...');
+        let url = `${apiBase}/notifications/preview-contextual?context_type=${contextType}`;
+        if (contextSubId !== 'all') {
+            url += `&subscription_id=${contextSubId}`;
+        }
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (res.ok) {
+                setContextText(data.draft);
+                setContextTargetSummary(data.target_summary);
+                setContextStatus(null);
+            } else {
+                setContextStatus(`Error: ${data.detail || 'Failed to fetch draft'}`);
+            }
+        } catch (e) {
+            setContextStatus('Network Error');
+        }
+    };
+
+    const handleSendContextual = async (e) => {
+        e.preventDefault();
+        setContextStatus('processing...');
+
+        let url = `${apiBase}/notifications/send-contextual?context_type=${contextType}&messenger_type=${contextMessenger}`;
+        if (contextSubId !== 'all') {
+            url += `&subscription_id=${contextSubId}`;
+        }
+        if (contextText) {
+            url += `&text=${encodeURIComponent(contextText)}`;
+        }
+
+        try {
+            const res = await fetch(url, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                setContextStatus(`Success! Processed ${data.processed_count} targeted messages.`);
+            } else {
+                setContextStatus(`Error: ${data.detail || 'Failed'}`);
+            }
+        } catch (e) {
+            setContextStatus('Network Error');
+        }
+    };
+
+    // --- Logic: Send Scenario ---
+    const handleSendScenario = async (e) => {
+        e.preventDefault();
+        setScenarioStatus('triggering scenario...');
+
+        try {
+            const res = await fetch(`${apiBase}/notifications/send-scenario?scenario_type=${scenarioType}&messenger_type=${scenarioMessenger}`, {
+                method: 'POST'
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setScenarioStatus(`Success! Processed ${data.processed_count} messages for this scenario.`);
+            } else {
+                setScenarioStatus(`Error: ${data.detail || 'Failed'}`);
+            }
+        } catch (e) {
+            setScenarioStatus('Network Error');
+        }
+    };
+
     // --- Logic: Settings ---
     const handleUserSelect = async (user) => {
         setSelectedUser(user);
@@ -296,6 +377,18 @@ function MessagingCenter() {
                             onClick={() => setActiveSubTab('channel')}
                         >
                             Channel Blast
+                        </span>
+                        <span
+                            style={{ marginLeft: '20px', cursor: 'pointer', opacity: activeSubTab === 'contextual' ? 1 : 0.5, fontWeight: 'bold', color: activeSubTab === 'contextual' ? '#818cf8' : 'inherit' }}
+                            onClick={() => setActiveSubTab('contextual')}
+                        >
+                            Contextual
+                        </span>
+                        <span
+                            style={{ marginLeft: '20px', cursor: 'pointer', opacity: activeSubTab === 'scenario' ? 1 : 0.5, fontWeight: 'bold', color: activeSubTab === 'scenario' ? '#818cf8' : 'inherit' }}
+                            onClick={() => setActiveSubTab('scenario')}
+                        >
+                            Scenario
                         </span>
                     </div>
 
@@ -474,52 +567,167 @@ function MessagingCenter() {
                             {bulkStatus && <div style={{ marginTop: '10px', color: '#10b981' }}>{bulkStatus}</div>}
                         </form>
                     )}
-                </div>
-            )}
 
-            {activeSubTab === 'channel' && (
-                <div className="card">
-                    <form onSubmit={handleSendChannel}>
-                        <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '15px' }}>
-                            Send a message to a configured Channel or Group. (Default: @PP_test123 for Telegram)
-                        </p>
+                    {activeSubTab === 'channel' && (
+                        <form onSubmit={handleSendChannel}>
+                            <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '15px' }}>
+                                Send a message to a configured Channel or Group. (Default: @PP_test123 for Telegram)
+                            </p>
 
-                        <div className="form-group">
-                            <label>Messenger Preference</label>
-                            <select value={channelMessenger} onChange={e => setChannelMessenger(e.target.value)}>
-                                <option value="telegram">Telegram</option>
-                                <option value="whatsapp">WhatsApp</option>
-                                <option value="mail">Email</option>
-                                <option value="discord">Discord</option>
-                            </select>
-                            {(channelMessenger !== 'telegram') && <div style={{ fontSize: '11px', color: '#f59e0b', marginTop: '4px' }}>
-                                Warning: Only Telegram has a configured default channel ID in .env currently.
-                            </div>}
-                        </div>
-
-                        <div className="form-group">
-                            <label>Message</label>
-                            <textarea
-                                style={textAreaStyle}
-                                value={channelText}
-                                onChange={e => setChannelText(e.target.value)}
-                                required
-                            />
-                            <div style={{ textAlign: 'right', fontSize: '11px', color: '#94a3b8' }}>
-                                {channelText.length} chars
+                            <div className="form-group">
+                                <label>Messenger Preference</label>
+                                <select value={channelMessenger} onChange={e => setChannelMessenger(e.target.value)}>
+                                    <option value="telegram">Telegram</option>
+                                    <option value="whatsapp">WhatsApp</option>
+                                    <option value="mail">Email</option>
+                                    <option value="discord">Discord</option>
+                                </select>
+                                {(channelMessenger !== 'telegram') && <div style={{ fontSize: '11px', color: '#f59e0b', marginTop: '4px' }}>
+                                    Warning: Only Telegram has a configured default channel ID in .env currently.
+                                </div>}
                             </div>
-                        </div>
 
-                        <div className="form-group">
-                            <label>Link (Optional)</label>
-                            <input type="text" value={channelLink} onChange={e => setChannelLink(e.target.value)} placeholder="https://..." />
-                        </div>
+                            <div className="form-group">
+                                <label>Message</label>
+                                <textarea
+                                    style={textAreaStyle}
+                                    value={channelText}
+                                    onChange={e => setChannelText(e.target.value)}
+                                    required
+                                />
+                                <div style={{ textAlign: 'right', fontSize: '11px', color: '#94a3b8' }}>
+                                    {channelText.length} chars
+                                </div>
+                            </div>
 
-                        <button className="primary" type="submit">Send to Channel</button>
-                        {channelStatus && <div style={{ marginTop: '10px', color: '#10b981' }}>{channelStatus}</div>}
-                    </form>
+                            <div className="form-group">
+                                <label>Link (Optional)</label>
+                                <input type="text" value={channelLink} onChange={e => setChannelLink(e.target.value)} placeholder="https://..." />
+                            </div>
+
+                            <button className="primary" type="submit">Send to Channel</button>
+                            {channelStatus && <div style={{ marginTop: '10px', color: '#10b981' }}>{channelStatus}</div>}
+                        </form>
+                    )}
+
+                    {activeSubTab === 'contextual' && (
+                        <form onSubmit={handleSendContextual}>
+                            <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '15px' }}>
+                                Trigger messages based on automated business logic and user rankings.
+                            </p>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.8fr', gap: '15px', marginBottom: '15px' }}>
+                                <div className="form-group">
+                                    <label>Context Strategy</label>
+                                    <select value={contextType} onChange={e => setContextType(e.target.value)}>
+                                        <option value="top_rankers">Top Rankers (Direct Msg)</option>
+                                        <option value="inspiring_top_10_30">Top 10-30 (Inspiring Msg)</option>
+                                        <option value="soft_reminder">Soft Reminder (Subscribed but Not Played Today)</option>
+                                        <option value="channel_promo">Channel Promo (Subscribe to Packages)</option>
+                                        <option value="channel_congrats_top_5">Channel Congrats (Mention Top 5)</option>
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Target Subscription</label>
+                                    <select value={contextSubId} onChange={e => setContextSubId(e.target.value)}>
+                                        <option value="all">Across All Subscriptions</option>
+                                        {subscriptions.map(s => (
+                                            <option key={s.id} value={s.id}>{s.name} ({s.platform})</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Messenger Preference</label>
+                                    <select value={contextMessenger} onChange={e => setContextMessenger(e.target.value)}>
+                                        <option value="telegram">Telegram</option>
+                                        <option value="whatsapp">WhatsApp</option>
+                                        <option value="mail">Email</option>
+                                        <option value="discord">Discord</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {contextTargetSummary && (
+                                <div style={{ fontSize: '12px', color: '#94a3b8', background: '#1e293b', padding: '10px', borderRadius: '4px', marginBottom: '15px', borderLeft: '3px solid #6366f1' }}>
+                                    <strong>Targeting:</strong> {contextTargetSummary}
+                                </div>
+                            )}
+
+                            <div className="form-group">
+                                <label>Message (Edit before sending)</label>
+                                <textarea
+                                    style={textAreaStyle}
+                                    value={contextText}
+                                    onChange={e => setContextText(e.target.value)}
+                                    placeholder="Click 'Sync' or type here..."
+                                    required
+                                />
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <button
+                                    type="button"
+                                    className="secondary"
+                                    style={{ width: 'auto', border: '1px dashed #6366f1', color: '#818cf8', display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px' }}
+                                    onClick={handleSyncContextualDraft}
+                                >
+                                    🔄 Sync Draft
+                                </button>
+
+                                <button className="primary" type="submit" style={{ width: 'auto', padding: '8px 20px' }}>
+                                    Send Messages
+                                </button>
+                            </div>
+                            {contextStatus && <div style={{ marginTop: '10px', color: '#10b981' }}>{contextStatus}</div>}
+                        </form>
+                    )}
+
+                    {activeSubTab === 'scenario' && (
+                        <form onSubmit={handleSendScenario}>
+                            <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '15px' }}>
+                                Automated business scenarios based on user lifecycle and behavior.
+                            </p>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+                                <div className="form-group">
+                                    <label>Scenario Logic</label>
+                                    <select value={scenarioType} onChange={e => setScenarioType(e.target.value)}>
+                                        <option value="unsubscribed_reminder">1. Unsubscribed Reminder (Alternate day)</option>
+                                        <option value="daily_score_update">2. Score Summary (After 2 rounds)</option>
+                                        <option value="eve_score_ranking">3. 10 PM Rank Status (Arcade/Wordly)</option>
+                                        <option value="subscription_expiry">4. Expiry Reminder (Today)</option>
+                                        <option value="inactive_subscriber">5. Inactive Subscriber (3 days ghost)</option>
+                                        <option value="daily_play_reminder">6. 10 AM Daily Reminder</option>
+                                        <option value="daily_winner_congrats">7. Daily Winner Congrats (External Ranking)</option>
+                                        <option value="daily_referral_promo">8. 12 PM Referral Promo</option>
+                                        <option value="weekly_winner_list_promo">9. 3 Days Continuous Play</option>
+                                        <option value="winning_position_warning">10. 10:30 PM Close-to-Winning Warning</option>
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Messenger Preference</label>
+                                    <select value={scenarioMessenger} onChange={e => setScenarioMessenger(e.target.value)}>
+                                        <option value="telegram">Telegram</option>
+                                        <option value="whatsapp">WhatsApp</option>
+                                        <option value="mail">Email</option>
+                                        <option value="discord">Discord</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button className="primary" type="submit" style={{ width: 'auto' }}>
+                                Trigger Scenario Now
+                            </button>
+                            {scenarioStatus && <div style={{ marginTop: '10px', color: '#10b981' }}>{scenarioStatus}</div>}
+                        </form>
+                    )}
                 </div>
             )}
+
+
 
             {activeTab === 'settings' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>

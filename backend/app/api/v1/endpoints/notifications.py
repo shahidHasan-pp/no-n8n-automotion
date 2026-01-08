@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.services.messaging import messaging_service
-from app.models.enums import MessengerType
+from app.models.enums import MessengerType, NotificationContextType, MessageScenarioType
 from app.crud import user as user_crud
 
 router = APIRouter()
@@ -41,6 +41,46 @@ def send_manual_notification(
     else:
         raise HTTPException(status_code=500, detail="Failed to send notification")
 
+@router.post("/send-contextual")
+def send_contextual_notification(
+    context_type: NotificationContextType,
+    messenger_type: MessengerType,
+    subscription_id: int = None,
+    text: str = None,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Send notifications based on a specific business context (rankings, streaks, etc.)
+    Allows overriding the message content.
+    """
+    result = messaging_service.send_contextual_messages(db, context_type, messenger_type, subscription_id, custom_text=text)
+    return result
+
+@router.get("/preview-contextual")
+def preview_contextual_notification(
+    context_type: NotificationContextType,
+    subscription_id: int = None,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Generate a preview of the contextual message and see who it targets.
+    """
+    result = messaging_service.preview_contextual_messages(db, context_type, subscription_id)
+    return result
+
+@router.post("/send-scenario")
+def send_scenario_notification(
+    scenario_type: MessageScenarioType,
+    messenger_type: MessengerType,
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """
+    Manually trigger one of the business scenarios.
+    Useful for testing or ad-hoc runs.
+    """
+    result = messaging_service.send_scenario_messages(db, scenario_type, messenger_type)
+    return result
+
 @router.post("/trigger-logic-check")
 def trigger_logic_check(
     user_id: int,
@@ -67,23 +107,25 @@ def send_bulk_notifications(
     """
     Send bulk notifications filtered by subscription status or specific subscription.
     """
-    from app.crud import user as user_crud
-    
-    # Re-use user_crud.get_with_filters but we might need to add subscription_id filtering support to it,
-    # or just query here. For simplicity, let's query here or update CRUD.
-    # To avoid changing CRUD repeatedly, let's just query efficiently here.
-    
     from app.models.user import User
+    from app.models.quiz import UserSubscribed
+    from sqlalchemy import exists
+
     query = db.query(User)
     
     if has_subscription is not None:
-         if has_subscription:
-            query = query.filter(User.subscription_id.isnot(None))
-         else:
-            query = query.filter(User.subscription_id.is_(None))
+        if has_subscription:
+            query = query.filter(exists().where(UserSubscribed.user_id == User.id))
+        else:
+            query = query.filter(~exists().where(UserSubscribed.user_id == User.id))
             
     if subscription_id:
-        query = query.filter(User.subscription_id == subscription_id)
+        query = query.filter(
+            exists().where(
+                (UserSubscribed.user_id == User.id) &
+                (UserSubscribed.subs_id == subscription_id)
+            )
+        )
         
     users = query.all()
     count = 0

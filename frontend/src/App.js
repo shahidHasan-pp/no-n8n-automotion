@@ -18,7 +18,7 @@ function App() {
           <Route path="/users" element={<Users />} />
           <Route path="/users/:userId" element={<UserDetail />} />
           <Route path="/subscriptions" element={<Subscriptions />} />
-          <Route path="/quizzes" element={<Quizzes />} />
+          <Route path="/user-subscription" element={<Quizzes />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/messaging-center" element={<MessagingCenter />} />
         </Routes>

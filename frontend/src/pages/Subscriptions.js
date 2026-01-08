@@ -7,6 +7,7 @@ function Subscriptions() {
         name: '',
         type: 'Standard',
         time: 'Monthly',
+        platform: 'quizard',
         offer: '',
         prize: ''
     });
@@ -42,7 +43,7 @@ function Subscriptions() {
             if (response.ok) {
                 fetchSubs();
                 setFormData({
-                    name: '', type: 'Standard', time: 'Monthly', offer: '', prize: ''
+                    name: '', type: 'Standard', time: 'Monthly', platform: 'quizard', offer: '', prize: ''
                 });
             } else {
                 const err = await response.json();
@@ -85,6 +86,15 @@ function Subscriptions() {
                             </div>
                         </div>
 
+                        <div className="form-group" style={{ marginTop: '10px' }}>
+                            <label style={{ fontSize: '12px', color: '#94a3b8' }}>Target Platform</label>
+                            <select name="platform" value={formData.platform} onChange={handleInputChange}>
+                                <option value="quizard">Quizard</option>
+                                <option value="wordly">Wordly</option>
+                                <option value="arcaderush">ArcadeRush</option>
+                            </select>
+                        </div>
+
                         <label style={{ fontSize: '12px', color: '#94a3b8' }}>Offer Text</label>
                         <input name="offer" value={formData.offer} onChange={handleInputChange} placeholder="e.g. 50% Off First Month" />
 
@@ -113,6 +123,7 @@ function Subscriptions() {
                                         <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                                             <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: '#334155' }}>{s.type}</span>
                                             <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: '#334155' }}>{s.time}</span>
+                                            <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: '#6366f1', textTransform: 'capitalize' }}>{s.platform}</span>
                                         </div>
                                     </td>
                                     <td>

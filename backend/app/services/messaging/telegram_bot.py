@@ -95,28 +95,16 @@ class TelegramBotService:
                     
                 # Extract message details
                 chat_id = message.get("chat", {}).get("id")
-                user_id_telegram = message.get("from", {}).get("id")
-                # Get the telegram username (grazier_shahid in example)
+                telegram_user_id = message.get("from", {}).get("id")
                 telegram_username_handle = message.get("from", {}).get("username", "") 
                 text = message.get("text", "").strip()
                 
                 if not chat_id or not text:
                     continue
                 
-                # Check for linking attempt
-                # Logic: Treat text as potential username. 
-                # If it starts with /start, strip it. If just text, use it as is.
-                potential_username = text
-                if text.startswith("/start"):
-                    parts = text.split(maxsplit=1)
-                    if len(parts) > 1:
-                        potential_username = parts[1].strip()
-                    else:
-                        potential_username = "" # Just /start with no username
-                
-                if potential_username:
-                    self._handle_user_linking(db, chat_id, user_id_telegram, telegram_username_handle, potential_username)
-                    processed_count += 1
+                # Use unified handler
+                self.handle_message(db, chat_id, telegram_user_id, telegram_username_handle, text)
+                processed_count += 1
                 
                 # Update last processed ID
                 if update_id and update_id > self.last_update_id:
@@ -128,88 +116,111 @@ class TelegramBotService:
         
         return processed_count
     
+    def handle_message(self, db: Session, chat_id: int, telegram_user_id: int, telegram_username_handle: str, text: str):
+        """
+        Unified message handler for both polling and webhooks.
+        Processes commands and linking attempts.
+        """
+        text = text.strip()
+        if not text:
+            return
+
+        # Check for linking attempt
+        # Logic: Treat text as potential username. 
+        # If it starts with /start, strip it. If just text, use it as is.
+        potential_username = text
+        if text.startswith("/start"):
+            parts = text.split(maxsplit=1)
+            if len(parts) > 1:
+                potential_username = parts[1].strip()
+            else:
+                # Just /start with no username
+                self.send_message(
+                    chat_id=chat_id,
+                    text=f"👋 Welcome! To link your account, please use /start followed by your username.\n"
+                         f"Example: `/start your_username`"
+                )
+                return
+        
+        if potential_username:
+            self._handle_user_linking(db, chat_id, telegram_user_id, telegram_username_handle, potential_username)
+    
     def _handle_user_linking(self, db: Session, chat_id: int, telegram_user_id: int, telegram_username_handle: str, provided_username: str):
         """
         Handle user account linking
-        
-        Args:
-            chat_id: Telegram Chat ID
-            telegram_user_id: Telegram User ID 
-            telegram_username_handle: The actual telegram username (e.g. grazier_shahid)
-            provided_username: The username text sent by user to match in DB (e.g. asdf)
         """
         try:
-            # Validate user exists in our DB
+            # Check if user exists in DB
             user = user_crud.get_by_username(db, username=provided_username)
             
             if not user:
                 logger.info(f"[Telegram Bot] Username '{provided_username}' not found in DB.")
+                self.send_message(
+                    chat_id=chat_id,
+                    text="আপনি এখনো রেজিস্টার করেননি।\nসার্ভিস চালু করতে এখনই রেজিস্ট্রেশন করুন।"
+                )
                 return
             
-            logger.info(f"[Telegram Bot] Found user: {user.username} (ID: {user.id})")
-            
-            # Check if already linked
-            if user.messenger:
-                current_telegram = user.messenger.telegram
-                if isinstance(current_telegram, dict):
-                    existing_chat_id = current_telegram.get("chat_id")
-                    if str(existing_chat_id) == str(chat_id):
-                        logger.info(f"[Telegram Bot] User {provided_username} already linked to chat_id {chat_id}. No action taken.")
-                        return
-
-            telegram_data = {
-                "chat_id": chat_id,
-                "user_id": telegram_user_id,
-                "username": telegram_username_handle, # Store the telegram handle (grazier_shahid)
-                "linked_at": time.time()
-            }
-            
-            # Transaction 1: Ensure Messenger Profile Exists
             messenger_profile = None
             if user.messenger_id:
                 messenger_profile = messenger_crud.get(db, id=user.messenger_id)
+
+            had_previous_telegram_link = False
+            if messenger_profile and messenger_profile.telegram and isinstance(messenger_profile.telegram, dict) and messenger_profile.telegram.get("chat_id"):
+                 had_previous_telegram_link = True
+                 existing_chat_id = messenger_profile.telegram.get("chat_id")
+                 if str(existing_chat_id) == str(chat_id):
+                    # Already linked to the same account.
+                    logger.info(f"[Telegram Bot] User {provided_username} already linked to chat_id {chat_id}.")
+                    self.send_message(
+                        chat_id=chat_id,
+                        text="আপনি ইতোমধ্যেই আমাদের সিস্টেমে নিবন্ধিত আছেন।\nআমাদের সার্ভিস সম্পর্কিত সকল বিস্তারিত তথ্য এখানে পেয়ে যাবেন।"
+                    )
+                    return
             
+            telegram_data = {
+                "chat_id": chat_id,
+                "user_id": telegram_user_id,
+                "username": telegram_username_handle, 
+                "linked_at": time.time()
+            }
+            
+            # Ensure Messenger Profile Exists
             if not messenger_profile:
                 logger.info(f"[Telegram Bot] Creating new messenger profile for User {user.id}")
-                # Create new messenger profile
                 messenger_profile = messenger_crud.create(db, obj_in={
                     "mail": {},
                     "telegram": {},
                     "whatsapp": {},
                     "discord": {}
                 })
-                # Link to user - DIRECT UPDATE
                 user.messenger_id = messenger_profile.id
                 db.add(user)
                 db.commit()
                 db.refresh(user)
-                logger.info(f"[Telegram Bot] Linked User {user.id} to Messenger {messenger_profile.id}")
             
-            # Transaction 2: Update Telegram Data
-            # DIRECT UPDATE to avoid CRUD issues with JSON fields
+            # Update Telegram Data
             messenger_profile.telegram = telegram_data
             
-            # We must flag the field as modified for SQLAlchemy to pick up JSON changes if it's mutable, 
-            # but since we are assigning a new dict, it should detect it.
-            # To be safe with some SQLAlchemy versions/types:
             from sqlalchemy.orm.attributes import flag_modified
             flag_modified(messenger_profile, "telegram")
             
             db.add(messenger_profile)
             db.commit()
-            db.refresh(messenger_profile)
             
-            logger.info(f"[Telegram Bot] Updated Messenger {messenger_profile.id} with telegram data: {telegram_data}")
-            
-            # Send success message
-            self.send_message(
-                chat_id=chat_id,
-                text=f"✅ Successfully linked to account: {user.username}\n"
-                     f"You will now receive notifications here."
-            )
-            
-            logger.info(f"[Telegram Bot] SUCCESS: User {provided_username} (ID: {user.id}) linked Telegram chat_id: {chat_id}")
-            
+            if had_previous_telegram_link:
+                logger.info(f"[Telegram Bot] SUCCESS: User {provided_username} updated Telegram chat_id to: {chat_id}")
+                self.send_message(
+                    chat_id=chat_id,
+                    text="আপনি ইতোমধ্যেই আমাদের সাথে যুক্ত আছেন।\nআমাদের সার্ভিস সম্পর্কিত সকল বিস্তারিত তথ্য এখানে পেয়ে যাবেন।"
+                )
+            else:
+                logger.info(f"[Telegram Bot] SUCCESS: User {provided_username} linked Telegram chat_id: {chat_id}")
+                self.send_message(
+                    chat_id=chat_id,
+                    text="অভিনন্দন! আপনার অ্যাকাউন্ট সফলভাবে যুক্ত করা হয়েছে।\nএখন থেকে আপনি সকল আপডেট ও নোটিফিকেশন এখানে পাবেন।"
+                )
+                
         except Exception as e:
             logger.error(f"[Telegram Bot] Exception in _handle_user_linking: {e}")
             db.rollback()

@@ -46,7 +46,7 @@ function UserDetail() {
             }
 
             // Fetch user subscriptions
-            const subsRes = await fetch(`${apiBase}/quizzes/user/${userId}/subscriptions`);
+            const subsRes = await fetch(`${apiBase}/user-subscription/user/${userId}/subscriptions`);
             if (subsRes.ok) {
                 const userSubs = await subsRes.json();
                 setSubscriptions(userSubs);
@@ -97,6 +97,15 @@ function UserDetail() {
                     <div>
                         <label style={{ fontSize: '12px', color: '#94a3b8', display: 'block' }}>Phone</label>
                         <p style={{ margin: '5px 0', fontSize: '16px' }}>{user.phone_number || 'N/A'}</p>
+                    </div>
+                    <div>
+                        <label style={{ fontSize: '12px', color: '#94a3b8', display: 'block' }}>Active Platforms</label>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '5px' }}>
+                            {user.quizard && <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(99, 102, 241, 0.2)', color: '#818cf8', border: '1px solid #334155' }}>Quizard</span>}
+                            {user.wordly && <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', border: '1px solid #334155' }}>Wordly</span>}
+                            {user.arcaderush && <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(236, 72, 153, 0.2)', color: '#ec4899', border: '1px solid #334155' }}>ArcadeRush</span>}
+                            {!user.quizard && !user.wordly && !user.arcaderush && <span style={{ color: '#64748b' }}>None</span>}
+                        </div>
                     </div>
                 </div>
             </div>

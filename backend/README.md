@@ -26,7 +26,7 @@ mysql -u root -p
 CREATE DATABASE social_scheduler;
 ```
 
-## 3. Run the Backend Application
+## 3. Run the Backend Application and telegram polling service
 
 Start the FastAPI application using Uvicorn:
 
@@ -34,6 +34,7 @@ Start the FastAPI application using Uvicorn:
 alembic revision --autogenerate -m "core db models"
 alembic upgrade head
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+.venv\Scripts\python run_telegram_polling.py
 ```
 
 ## 4. Migrate DB and Seed Dummy Data (Optional)
