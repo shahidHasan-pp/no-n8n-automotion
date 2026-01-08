@@ -244,7 +244,8 @@ class MessagingService:
         import requests
         from datetime import timedelta
         count = 0
-        
+
+        # 1. Unsubscribed Reminder
         if scenario_type == MessageScenarioType.UNSUBSCRIBED_REMINDER:
             # Mapping from platform attribute name to PlatformType enum and display name
             platform_info = {
@@ -296,7 +297,7 @@ class MessagingService:
                         text = f"আপনি এখনো {platform_display_name} সার্ভিসেটিতে সাবস্ক্রিপশন করেন নি। এখনই সাবস্ক্রিপশন খেলুন এবং লুফে নিন ডেইলি, উইকলি, মেগা প্রাইজ সহ অনেক অনেক আকর্ষণীয় পুরষ্কার জেতার সুযোগ।"
                         self.send_message(db, messenger_type, "resolve", text, user_id=user.id)
                         count += 1
-        
+        # 2. Score Summary (after 2 rounds)
         elif scenario_type == MessageScenarioType.DAILY_SCORE_UPDATE:
             leaderboard_urls = {
                 # Quizard
@@ -432,6 +433,7 @@ class MessagingService:
                     self.send_message(db, messenger_type, "resolve", text, user_id=user.id)
                     count += 1
 
+        # 3. 10 PM Rank Status
         elif scenario_type == MessageScenarioType.EVE_SCORE_RANKING:
             # Scenario 3: At 10 pm to users who played ArcadeRush or Sudoko from Wordly.
             # Sudoko is a subscription name. Assuming name check for now.
@@ -457,6 +459,7 @@ class MessagingService:
                 self.send_message(db, messenger_type, "resolve", text, user_id=r.id)
                 count += 1
 
+        # 4. Expiry Reminder (last_date = today)
         elif scenario_type == MessageScenarioType.SUBSCRIPTION_EXPIRY:
             # Scenario 4: end_date == today
             expiring = db.query(UserSubscribed).filter(func.date(UserSubscribed.end_date) == date.today()).all()
@@ -467,6 +470,7 @@ class MessagingService:
                 self.send_message(db, messenger_type, "resolve", text, user_id=es.user_id)
                 count += 1
 
+        # Inactive Subscriber (last_played_date < today - 3 days)
         elif scenario_type == MessageScenarioType.INACTIVE_SUBSCRIBER:
             # Scenario 5: Subscribed but stopped playing for consecutive 3 days.
             three_days_ago = date.today() - timedelta(days=3)
@@ -481,6 +485,7 @@ class MessagingService:
                 self.send_message(db, messenger_type, "resolve", text, user_id=u.id)
                 count += 1
 
+        # 6. 10 AM Daily Reminder
         elif scenario_type == MessageScenarioType.DAILY_PLAY_REMINDER:
             # Scenario 6: 10 AM reminder to subscribed users who didn't play today.
             today = date.today()
@@ -493,6 +498,7 @@ class MessagingService:
                 self.send_message(db, messenger_type, "resolve", text, user_id=u.id)
                 count += 1
 
+        # 7. Daily Winner Congrats
         elif scenario_type == MessageScenarioType.DAILY_WINNER_CONGRATS:
             # Scenario 7: External rank check.
             try:
@@ -523,6 +529,7 @@ class MessagingService:
             except:
                 pass
 
+        # 8. 12 PM Referral Promo
         elif scenario_type == MessageScenarioType.DAILY_REFERRAL_PROMO:
             # Scenario 8: Daily refer sms to all.
             all_users = db.query(User).all()
@@ -531,6 +538,7 @@ class MessagingService:
                 self.send_message(db, messenger_type, "resolve", text, user_id=u.id)
                 count += 1
 
+        # 9. 3 Days Continuous Play
         elif scenario_type == MessageScenarioType.WEEKLY_WINNER_LIST_PROMO:
             # Scenario 9: 3 days continuous play.
             three_days_ago = date.today() - timedelta(days=2) # inclusive
@@ -548,30 +556,86 @@ class MessagingService:
                 self.send_message(db, messenger_type, "resolve", text, user_id=u.user_id)
                 count += 1
 
+        # 10. 10:30 Close-to-Winning Warning
         elif scenario_type == MessageScenarioType.WINNING_POSITION_WARNING:
-            # Scenario 10: 10:30 PM ArcadeRush or Wordly-Sudoko - Close to winning.
-            # Similar to scenario 3 but different message
-            # For brevity, let's look for users in rank 6-15 (assuming top 5 win)
-            query = db.query(User.id, Subscription.id.label('subs_id'), Subscription.name, func.max(PlayedQuiz.score).label('max_score'))\
-                .join(PlayedQuiz, User.id == PlayedQuiz.user_id)\
-                .join(Subscription, PlayedQuiz.subs_id == Subscription.id)\
-                .filter(func.date(PlayedQuiz.created_at) == date.today())\
-                .filter(Subscription.platform == PlatformType.ARCADERUSH)
+            import requests
+            import json
             
-            results = query.group_by(User.id, Subscription.id, Subscription.name).all()
-            for r in results:
-                rank = db.query(func.count(User.id))\
-                    .select_from(User)\
-                    .join(PlayedQuiz, User.id == PlayedQuiz.user_id)\
-                    .filter(PlayedQuiz.subs_id == r.subs_id)\
-                    .filter(func.date(PlayedQuiz.created_at) == date.today())\
-                    .group_by(User.id)\
-                    .having(func.max(PlayedQuiz.score) > r.max_score).count() + 1
-                
-                if 5 < rank <= 20: # Example "close to winning" range
-                    text = f"ইতিমধ্যে জেনেছেন “{r.name}” গেমের লিডারবোর্ডে আপনার অবস্থান “{rank}“ তম। এই অবস্থানে আজকের ডেইলি প্রাইজ পাওয়া সম্ভব হবে না। দয়া করে আরেকটু চেষ্টা করুন। রাত ১১.৫৯ এর মধ্যে “ 5 “ তম অবস্থানের ভিতরে থাকলেই পেয়ে যাবেন ডেইলি প্রাইজ।"
-                    self.send_message(db, messenger_type, "resolve", text, user_id=r.id)
-                    count += 1
+            leaderboard_urls = {
+                # Quizard
+                "Sports Quiz Arena": "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=75",
+                # Arcaderush
+                "Moto Race City": "https://arcaderush.xyz/Leaderboard/GetLeaderboard?gameName=Knife%20Madness&eventId=1001",
+            }
+
+            # Mock data simulating API responses for testing
+            all_mock_data = {
+                "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=75": json.dumps([
+                    {"User_Rank": 10, "msisdn": "1111111111", "score": 100},
+                    # Assume 48 other users here to make the rank realistic
+                    {"User_Rank": 50, "msisdn": "5050505050", "score": 60},
+                    {"User_Rank": 60, "msisdn": "2222222222", "score": 50}
+                ]),
+                "https://arcaderush.xyz/Leaderboard/GetLeaderboard?gameName=Knife%20Madness&eventId=1001": json.dumps(
+                    # Generate 50 dummy winners for arcaderush
+                    [{"username": f"999{i}", "score": 1000 - i*10} for i in range(50)] +
+                    # Add our test users who should receive notifications
+                    [
+                        {"username": "04444444444", "score": 5000} # This user will be rank 51
+                    ]
+                )
+            }
+
+            # Helper to find user, accounting for username/msisdn format differences
+            def get_user_by_msisdn(db: Session, msisdn: str) -> Optional[User]:
+                # Try direct match first
+                user = db.query(User).filter(User.username == msisdn).first()
+                if user:
+                    return user
+                # Try with/without leading '0'
+                if msisdn.startswith('0'):
+                    user = db.query(User).filter(User.username == msisdn[1:]).first()
+                else:
+                    user = db.query(User).filter(User.username == '0' + msisdn).first()
+                return user
+
+            for game_name, url in leaderboard_urls.items():
+                try:
+                    # response = requests.get(url, timeout=15)
+                    # response.raise_for_status()
+                    # leaderboard_data = response.json()
+                    
+                    # Use mock data instead of live API call
+                    mock_response_str = all_mock_data.get(url)
+                    if not mock_response_str:
+                        logger.warning(f"No mock data for URL: {url}")
+                        continue
+                    leaderboard_data = json.loads(mock_response_str)
+
+                    players = []
+                    if "arcaderush.xyz" in url:
+                        if isinstance(leaderboard_data, list):
+                            for i, entry in enumerate(leaderboard_data):
+                                if isinstance(entry, dict) and "username" in entry:
+                                    players.append({"username": entry["username"], "rank": i + 1})
+                    else: # Quizard/Wordly
+                        if isinstance(leaderboard_data, list):
+                            for entry in leaderboard_data:
+                                if isinstance(entry, dict) and "msisdn" in entry and "User_Rank" in entry:
+                                    players.append({"username": str(entry["msisdn"]), "rank": entry["User_Rank"]})
+                    
+                    for player in players:
+                        rank = player["rank"]
+                        if rank > 50:
+                            user = get_user_by_msisdn(db, player["username"])
+                            if user:
+                                text = f"ইতিমধ্যে জেনেছেন “{game_name}” গেমের লিডারবোর্ডে আপনার অবস্থান “{rank}“ তম। এই অবস্থানে আজকের ডেইলি প্রাইজ পাওয়া সম্ভব হবে না। দয়া করে আরেকটু চেষ্টা করুন। রাত ১১.৫৯ এর মধ্যে “50“ তম অবস্থানের ভিতরে থাকলেই পেয়ে যাবেন ডেইলি প্রাইজ।"
+                                self.send_message(db, messenger_type, "resolve", text, user_id=user.id)
+                                count += 1
+
+                except Exception as e:
+                    logger.error(f"Failed to process leaderboard for WINNING_POSITION_WARNING from {url}: {e}")
+                    continue
 
         return {"status": "success", "processed_count": count}
 
