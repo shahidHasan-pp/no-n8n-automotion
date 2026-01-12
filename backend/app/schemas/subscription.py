@@ -13,7 +13,7 @@ class SubscriptionBase(BaseModel):
     platform: Optional[PlatformType] = None
     offer: Optional[str] = None
     prize: Optional[str] = None
-    remark: List[Any] = []
+    remark: Optional[List[Any]] = []
     amount: Optional[int] = None
     link: Optional[str] = None
     start_date: Optional[datetime] = None
@@ -50,10 +50,4 @@ class SubscriptionUpdate(SubscriptionBase):
     pass
 
 class Subscription(SubscriptionBase, BaseSchema):
-    current_subs_quantity: int = 0
-    
-    @validator('current_subs_quantity', pre=True)
-    def default_subs_quantity_if_none(cls, v):
-        if v is None:
-            return 0
-        return v
+    current_subs_quantity: Optional[int] = 0

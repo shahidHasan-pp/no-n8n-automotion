@@ -299,6 +299,29 @@ class MessagingService:
                         count += 1
         # 2. Score Summary (after 2 rounds)
         elif scenario_type == MessageScenarioType.DAILY_SCORE_UPDATE:
+            today = date.today()
+            # Calculate users who played the same subscription at least 2 times today
+            round_counts = db.query(
+                PlayedQuiz.user_id,
+                PlayedQuiz.subs_id,
+                func.max(PlayedQuiz.score).label('max_score')
+            ).filter(func.date(PlayedQuiz.created_at) == today)\
+             .group_by(PlayedQuiz.user_id, PlayedQuiz.subs_id)\
+             .having(func.count(PlayedQuiz.id) >= 2).all()
+            
+            for r in round_counts:
+                # Get max score
+                max_score = r.max_score
+                if max_score is None:
+                    continue
+                    
+                text = f"আপনার আজকের দুটি রাউন্ড সফল ভাবে সম্পন্ন হয়েছে। আজকে আপনার সর্বোচ্চ স্কোর “ {max_score} “"
+                self.send_message(db, messenger_type, "resolve", text, user_id=r.user_id)
+                count += 1
+
+        # 3. 10 PM Rank Status
+        elif scenario_type == MessageScenarioType.EVE_SCORE_RANKING:
+            # Scenario 3: Targets users who played today. Shows rank from external leaderboard.
             leaderboard_urls = {
                 # Quizard
                 "Ramadan Quiz Challenge": "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=34",
@@ -319,145 +342,72 @@ class MessagingService:
                 "Knife Madness": "https://arcaderush.xyz/Leaderboard/GetLeaderboard?gameName=Knife%20Madness&eventId=1002",
                 "20248 Crazy Merge": "https://arcaderush.xyz/Leaderboard/GetLeaderboard?gameName=Knife%20Madness&eventId=1003",
             }
-            leaderboard_cache = {} # Cache for leaderboard data {url: {username: rank}}
-
-            def get_rank_from_leaderboard(url: str, username: str) -> Optional[int]:
-                if url not in leaderboard_cache:
-                    try:
-                        # response = requests.get(url, timeout=10)
-                        # response.raise_for_status()
-                        # leaderboard_data = response.json()
-
-                        # Mock data - in real implementation, this should be the actual API response
-                        # Each URL should return leaderboard for ONLY that specific game
-                        all_mock_data = {
-                            "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=153": [
-                                {
-                                    "User_Rank": 1,
-                                    "msisdn": "1628975383",
-                                    "score": 59,
-                                    "time_taken": 136,
-                                    "round_number": 1,
-                                    "date": "2026-01-07",
-                                    "event_id": 153,
-                                    "category": None,
-                                    "win": 1,
-                                    "name": "",
-                                    "username": "1628975383",
-                                    "avatar_id": None,
-                                    "avatar_img": ""
-                                },
-                            ],
-                            "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=151": [
-                                {
-                                    "User_Rank": 2,
-                                    "msisdn": "1628975383",
-                                    "score": 49,
-                                    "time_taken": 156,
-                                    "round_number": 1,
-                                    "date": "2026-01-07",
-                                    "event_id": 151,
-                                    "category": None,
-                                    "win": 1,
-                                    "name": "Ullah",
-                                    "username": "1628975383",
-                                    "avatar_id": 1,
-                                    "avatar_img": "images/20250417_180333.jpg"
-                                },
-                            ],
-                        }
-                        
-                        leaderboard_data = all_mock_data.get(url, [])
-                        
-                        rank_map = {}
-                        
-                        if "arcaderush.xyz" in url:
-                            # Arcaderush format: rank is the index + 1
-                            if isinstance(leaderboard_data, list):
-                                for i, entry in enumerate(leaderboard_data):
-                                    if isinstance(entry, dict) and "username" in entry:
-                                        leaderboard_user = entry["username"]
-                                        rank_map[leaderboard_user] = i + 1
-                        else:
-                            # Quizard/Wordly format
-                            if isinstance(leaderboard_data, list):
-                                for entry in leaderboard_data:
-                                    if isinstance(entry, dict) and "msisdn" in entry and "User_Rank" in entry:
-                                        rank_map[str(entry["msisdn"])] = entry["User_Rank"]
-                        
-                        leaderboard_cache[url] = rank_map
-                    except Exception as e:
-                        logger.error(f"Failed to fetch or parse leaderboard from {url}: {e}")
-                        leaderboard_cache[url] = {} # Don't try again
-
-                # Find the user in the cached map, handling different username formats
-                cached_map = leaderboard_cache.get(url, {})
-                
-                # Direct match
-                rank = cached_map.get(username)
-                if rank is not None:
-                    return rank
-
-                # Try matching with/without leading '0'
-                if username.startswith('0'):
-                    rank = cached_map.get(username[1:])
-                else:
-                    rank = cached_map.get('0' + username)
-                
-                return rank
+            
+            # Helper to fetch rank (Duplicated or should be shared, but keeping inline for safety in replacement)
+            def get_leaderboard_data(url: str):
+                # response = requests.get(url, timeout=10)
+                # response.raise_for_status()
+                # return response.json()
+                all_mock_data = {
+                    "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=149": [
+                        {"User_Rank": 12, "msisdn": "1962401320", "score": 57, "time_taken": 136, "round_number": 1, "date": "2026-01-12", "event_id": 149, "category": None, "win": 1, "name": "", "username": "1962401320", "avatar_id": None, "avatar_img": ""},
+                    ],
+                    "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=149": [
+                         {"User_Rank": 1, "msisdn": "1962401320", "score": 59, "time_taken": 136, "round_number": 1, "date": "2026-01-07", "event_id": 149, "category": None, "win": 1, "name": "", "username": "1962401320", "avatar_id": None, "avatar_img": ""},
+                    ],
+                    "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=151": [
+                        {"User_Rank": 2, "msisdn": "1628975383", "score": 49, "time_taken": 156, "round_number": 1, "date": "2026-01-07", "event_id": 151, "category": None, "win": 1, "name": "Ullah", "username": "1628975383", "avatar_id": 1, "avatar_img": "images/20250417_180333.jpg"},
+                    ],
+                }
+                return all_mock_data.get(url, [])
 
             today = date.today()
-            round_counts = db.query(
+            # Get users who played today and their max score
+            played_stats = db.query(
                 PlayedQuiz.user_id,
                 PlayedQuiz.subs_id,
                 func.max(PlayedQuiz.score).label('max_score')
             ).filter(func.date(PlayedQuiz.created_at) == today)\
-             .group_by(PlayedQuiz.user_id, PlayedQuiz.subs_id)\
-             .having(func.count(PlayedQuiz.id) >= 2).all()
-            
-            for r in round_counts:
-                user = db.query(User).filter(User.id == r.user_id).first()
-                sub = db.query(Subscription).filter(Subscription.id == r.subs_id).first()
+             .group_by(PlayedQuiz.user_id, PlayedQuiz.subs_id).all()
 
+            for ps in played_stats:
+                user = db.query(User).filter(User.id == ps.user_id).first()
+                sub = db.query(Subscription).filter(Subscription.id == ps.subs_id).first()
+                
                 if not (user and sub and sub.name in leaderboard_urls):
                     continue
-                
+
                 game_name = sub.name
-                max_score = r.max_score
+                max_score = ps.max_score
                 url = leaderboard_urls[game_name]
                 
-                rank = get_rank_from_leaderboard(url, user.username)
-
-                if rank is not None:
-                    text = f"আজকে আপনি {game_name} গেমটি খেলেছেন এবং এখন পর্যন্ত আপনার সর্বোচ্চ স্কোর {max_score}। আপনি লিডারবোর্ডে {rank} তম অবস্থানে রয়েছেন।"
-                    self.send_message(db, messenger_type, "resolve", text, user_id=user.id)
-                    count += 1
-
-        # 3. 10 PM Rank Status
-        elif scenario_type == MessageScenarioType.EVE_SCORE_RANKING:
-            # Scenario 3: At 10 pm to users who played ArcadeRush or Sudoko from Wordly.
-            # Sudoko is a subscription name. Assuming name check for now.
-            query = db.query(User.id, Subscription.id.label('subs_id'), Subscription.name, func.max(PlayedQuiz.score).label('max_score'))\
-                .join(PlayedQuiz, User.id == PlayedQuiz.user_id)\
-                .join(Subscription, PlayedQuiz.subs_id == Subscription.id)\
-                .filter(func.date(PlayedQuiz.created_at) == date.today())\
-                .filter(Subscription.platform == PlatformType.ARCADERUSH)
-            
-            # This needs rank calculation.
-            results = query.group_by(User.id, Subscription.id, Subscription.name).all()
-            for r in results:
-                # Calculate rank relative to others in same subscription today
-                rank = db.query(func.count(User.id))\
-                    .select_from(User)\
-                    .join(PlayedQuiz, User.id == PlayedQuiz.user_id)\
-                    .filter(PlayedQuiz.subs_id == r.subs_id)\
-                    .filter(func.date(PlayedQuiz.created_at) == date.today())\
-                    .group_by(User.id)\
-                    .having(func.max(PlayedQuiz.score) > r.max_score).count() + 1
-                
-                text = f"আজকে আপনি “{r.name}” গেমটি খেলেছেন এবং এখন পর্যন্ত আপনার সর্বোচ্চ স্কোর “{r.max_score}“। আপনি লিডারবোর্ডে “{rank}“ তম অবস্থানে রয়েছেন।"
-                self.send_message(db, messenger_type, "resolve", text, user_id=r.id)
-                count += 1
+                try:
+                    data = get_leaderboard_data(url)
+                    rank = None
+                    
+                    if "arcaderush.xyz" in url:
+                        if isinstance(data, list):
+                            for i, entry in enumerate(data):
+                                if entry.get("username") == user.username:
+                                    rank = i + 1
+                                    break
+                    else:
+                        if isinstance(data, list):
+                            for entry in data:
+                                # Match username with msisdn (handling 0 prefix if needed)
+                                msisdn = str(entry.get("msisdn", ""))
+                                if msisdn == user.username or (user.username and msisdn == user.username.lstrip('0')) or (user.username and msisdn.lstrip('0') == user.username):
+                                    rank = entry.get("User_Rank")
+                                    break
+                    
+                    if rank:
+                        text = f"আজকে আপনি “ {game_name} “ গেমটি খেলেছেন এবং এখন পর্যন্ত আপনার সর্বোচ্চ স্কোর “ {max_score} “। আপনি লিডারবোর্ডে “ {rank} “ তম অবস্থানে রয়েছেন।"
+                        self.send_message(db, messenger_type, "resolve", text, user_id=user.id)
+                        count += 1
+                        
+                except Exception as e:
+                    logger.error(f"Error in EVE_SCORE_RANKING for {game_name}: {e}")
+                    continue
 
         # 4. Expiry Reminder (last_date = today)
         elif scenario_type == MessageScenarioType.SUBSCRIPTION_EXPIRY:
@@ -558,35 +508,43 @@ class MessagingService:
 
         # 10. 10:30 Close-to-Winning Warning
         elif scenario_type == MessageScenarioType.WINNING_POSITION_WARNING:
-            import requests
             import json
             
             leaderboard_urls = {
                 # Quizard
+                "Ramadan Quiz Challenge": "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=34",
                 "Sports Quiz Arena": "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=75",
+                "Brain Power Quiz": "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=149",
+                "Eid Mega Tournament Quiz": "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=150",
+                # Wordly
+                "Wordly English": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=67",
+                "Wordly Bangla": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=79",
+                "Spelling Bee": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=134",
+                "Memory Match": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=151",
+                "Sudoku Easy": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=152",
+                "Sudoku Medium": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=153",
+                "SudokuHard": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=154",
+                "Sudoku Expert": "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=155",
                 # Arcaderush
                 "Moto Race City": "https://arcaderush.xyz/Leaderboard/GetLeaderboard?gameName=Knife%20Madness&eventId=1001",
+                "Knife Madness": "https://arcaderush.xyz/Leaderboard/GetLeaderboard?gameName=Knife%20Madness&eventId=1002",
+                "20248 Crazy Merge": "https://arcaderush.xyz/Leaderboard/GetLeaderboard?gameName=Knife%20Madness&eventId=1003",
             }
 
-            # Mock data simulating API responses for testing
+            # Mock data 
             all_mock_data = {
-                "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=75": json.dumps([
-                    {"User_Rank": 10, "msisdn": "1111111111", "score": 100},
-                    # Assume 48 other users here to make the rank realistic
-                    {"User_Rank": 50, "msisdn": "5050505050", "score": 60},
-                    {"User_Rank": 60, "msisdn": "2222222222", "score": 50}
-                ]),
-                "https://arcaderush.xyz/Leaderboard/GetLeaderboard?gameName=Knife%20Madness&eventId=1001": json.dumps(
-                    # Generate 50 dummy winners for arcaderush
-                    [{"username": f"999{i}", "score": 1000 - i*10} for i in range(50)] +
-                    # Add our test users who should receive notifications
-                    [
-                        {"username": "04444444444", "score": 5000} # This user will be rank 51
-                    ]
-                )
+                "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=149": [
+                     {"User_Rank": 55, "msisdn": "1962401320", "score": 57, "time_taken": 136, "round_number": 1, "date": "2026-01-12", "event_id": 149, "category": None, "win": 1, "name": "", "username": "1962401320", "avatar_id": None, "avatar_img": ""}
+                ],
+                "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=153": [
+                    {"User_Rank": 1, "msisdn": "1628975383", "score": 59, "time_taken": 136, "round_number": 1, "date": "2026-01-07", "event_id": 153, "category": None, "win": 1, "name": "", "username": "1628975383", "avatar_id": None, "avatar_img": ""}
+                ],
+                "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=151": [
+                    {"User_Rank": 2, "msisdn": "1628975383", "score": 49, "time_taken": 156, "round_number": 1, "date": "2026-01-07", "event_id": 151, "category": None, "win": 1, "name": "Ullah", "username": "1628975383", "avatar_id": 1, "avatar_img": "images/20250417_180333.jpg"}
+                ],
             }
 
-            # Helper to find user, accounting for username/msisdn format differences
+            # Validating user helper (duplicated for safety)
             def get_user_by_msisdn(db: Session, msisdn: str) -> Optional[User]:
                 # Try direct match first
                 user = db.query(User).filter(User.username == msisdn).first()
@@ -598,19 +556,18 @@ class MessagingService:
                 else:
                     user = db.query(User).filter(User.username == '0' + msisdn).first()
                 return user
-
+            
+            # This logic iterates ALL games in leaderboard_urls? 
+            # Or should it only check for users who have subscriptions/activity?
+            # Existing logic iterated all. We will iterate all urls to check rank.
+            
             for game_name, url in leaderboard_urls.items():
                 try:
                     # response = requests.get(url, timeout=15)
                     # response.raise_for_status()
                     # leaderboard_data = response.json()
                     
-                    # Use mock data instead of live API call
-                    mock_response_str = all_mock_data.get(url)
-                    if not mock_response_str:
-                        logger.warning(f"No mock data for URL: {url}")
-                        continue
-                    leaderboard_data = json.loads(mock_response_str)
+                    leaderboard_data = all_mock_data.get(url, [])
 
                     players = []
                     if "arcaderush.xyz" in url:
@@ -626,10 +583,16 @@ class MessagingService:
                     
                     for player in players:
                         rank = player["rank"]
-                        if rank > 50:
+                        # Warning if rank is not "good enough"? 
+                        # User text: "আজকের ডেইলি প্রাইজ পাওয়া সম্ভব হবে না... রাত ১১.৫৯ এর মধ্যে “ “ তম অবস্থানের ভিতরে থাকলেই..."
+                        # Currently hardcoded check > 50?
+                        # Assuming threshold is 50 for now based on previous code.
+                        TARGET_RANK = 50
+                        
+                        if rank > TARGET_RANK: # If rank is worse than 50
                             user = get_user_by_msisdn(db, player["username"])
                             if user:
-                                text = f"ইতিমধ্যে জেনেছেন “{game_name}” গেমের লিডারবোর্ডে আপনার অবস্থান “{rank}“ তম। এই অবস্থানে আজকের ডেইলি প্রাইজ পাওয়া সম্ভব হবে না। দয়া করে আরেকটু চেষ্টা করুন। রাত ১১.৫৯ এর মধ্যে “50“ তম অবস্থানের ভিতরে থাকলেই পেয়ে যাবেন ডেইলি প্রাইজ।"
+                                text = f"ইতিমধ্যে জেনেছেন “ {game_name} “ গেমের লিডারবোর্ডে আপনার অবস্থান “ {rank} “ তম। এই অবস্থানে আজকের ডেইলি প্রাইজ পাওয়া সম্ভব হবে না। দয়া করে আরেকটু চেষ্টা করুন। রাত ১১.৫৯ এর মধ্যে “ {TARGET_RANK} “ তম অবস্থানের ভিতরে থাকলেই পেয়ে যাবেন ডেইলি প্রাইজ।"
                                 self.send_message(db, messenger_type, "resolve", text, user_id=user.id)
                                 count += 1
 
