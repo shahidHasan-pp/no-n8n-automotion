@@ -46,6 +46,11 @@ A context-aware messaging service sending notifications via Email, WhatsApp, Tel
     ```
     *(Note: on Windows, install `gevent` if needed or use `-P solo`)*
 
+7.  Run Telegram Bot Polling (in new terminal):
+    ```bash
+    python run_telegram_polling.py
+    ```
+
 ### Frontend Setup
 1.  Navigate to `frontend`:
     ```bash

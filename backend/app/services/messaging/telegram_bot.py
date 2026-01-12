@@ -218,7 +218,8 @@ class TelegramBotService:
                 logger.info(f"[Telegram Bot] SUCCESS: User {provided_username} linked Telegram chat_id: {chat_id}")
                 self.send_message(
                     chat_id=chat_id,
-                    text="অভিনন্দন! আপনার অ্যাকাউন্ট সফলভাবে যুক্ত করা হয়েছে।\nএখন থেকে আপনি সকল আপডেট ও নোটিফিকেশন এখানে পাবেন।"
+                    text="অভিনন্দন! আপনার অ্যাকাউন্ট সফলভাবে যুক্ত করা হয়েছে।\nএখন থেকে আপনি সকল আপডেট ও নোটিফিকেশন এখানে পাবেন।\
+                        \n\nখেলতে ক্লিক করুন- https://quizard.live/?qcid=246"
                 )
                 
         except Exception as e:

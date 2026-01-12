@@ -294,7 +294,8 @@ class MessagingService:
                             break
                     
                     if platform_display_name:
-                        text = f"আপনি এখনো {platform_display_name} সার্ভিসেটিতে সাবস্ক্রিপশন করেন নি। এখনই সাবস্ক্রিপশন খেলুন এবং লুফে নিন ডেইলি, উইকলি, মেগা প্রাইজ সহ অনেক অনেক আকর্ষণীয় পুরষ্কার জেতার সুযোগ।"
+                        text = f"আপনি এখনো {platform_display_name} সার্ভিসেটিতে সাবস্ক্রিপশন করেন নি। এখনই সাবস্ক্রিপশন খেলুন এবং লুফে নিন ডেইলি, উইকলি, মেগা প্রাইজ সহ অনেক অনেক আকর্ষণীয় পুরষ্কার জেতার সুযোগ।\
+                            \n\nখেলতে ক্লিক করুন- https://quizard.live/?qcid=246"
                         self.send_message(db, messenger_type, "resolve", text, user_id=user.id)
                         count += 1
         # 2. Score Summary (after 2 rounds)
@@ -315,7 +316,8 @@ class MessagingService:
                 if max_score is None:
                     continue
                     
-                text = f"আপনার আজকের দুটি রাউন্ড সফল ভাবে সম্পন্ন হয়েছে। আজকে আপনার সর্বোচ্চ স্কোর “ {max_score} “"
+                text = f"আপনার আজকের দুটি রাউন্ড সফল ভাবে সম্পন্ন হয়েছে। আজকে আপনার সর্বোচ্চ স্কোর {max_score}\
+                    \n\nখেলতে ক্লিক করুন- https://quizard.live/?qcid=246"
                 self.send_message(db, messenger_type, "resolve", text, user_id=r.user_id)
                 count += 1
 
@@ -345,21 +347,21 @@ class MessagingService:
             
             # Helper to fetch rank (Duplicated or should be shared, but keeping inline for safety in replacement)
             def get_leaderboard_data(url: str):
-                # response = requests.get(url, timeout=10)
-                # response.raise_for_status()
-                # return response.json()
-                all_mock_data = {
-                    "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=149": [
-                        {"User_Rank": 12, "msisdn": "1962401320", "score": 57, "time_taken": 136, "round_number": 1, "date": "2026-01-12", "event_id": 149, "category": None, "win": 1, "name": "", "username": "1962401320", "avatar_id": None, "avatar_img": ""},
-                    ],
-                    "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=149": [
-                         {"User_Rank": 1, "msisdn": "1962401320", "score": 59, "time_taken": 136, "round_number": 1, "date": "2026-01-07", "event_id": 149, "category": None, "win": 1, "name": "", "username": "1962401320", "avatar_id": None, "avatar_img": ""},
-                    ],
-                    "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=151": [
-                        {"User_Rank": 2, "msisdn": "1628975383", "score": 49, "time_taken": 156, "round_number": 1, "date": "2026-01-07", "event_id": 151, "category": None, "win": 1, "name": "Ullah", "username": "1628975383", "avatar_id": 1, "avatar_img": "images/20250417_180333.jpg"},
-                    ],
-                }
-                return all_mock_data.get(url, [])
+                response = requests.get(url, timeout=10)
+                response.raise_for_status()
+                return response.json()
+                # all_mock_data = {
+                #     "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=149": [
+                #         {"User_Rank": 12, "msisdn": "1962401320", "score": 57, "time_taken": 136, "round_number": 1, "date": "2026-01-12", "event_id": 149, "category": None, "win": 1, "name": "", "username": "1962401320", "avatar_id": None, "avatar_img": ""},
+                #     ],
+                #     "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=149": [
+                #          {"User_Rank": 1, "msisdn": "1962401320", "score": 59, "time_taken": 136, "round_number": 1, "date": "2026-01-07", "event_id": 149, "category": None, "win": 1, "name": "", "username": "1962401320", "avatar_id": None, "avatar_img": ""},
+                #     ],
+                #     "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=151": [
+                #         {"User_Rank": 2, "msisdn": "1628975383", "score": 49, "time_taken": 156, "round_number": 1, "date": "2026-01-07", "event_id": 151, "category": None, "win": 1, "name": "Ullah", "username": "1628975383", "avatar_id": 1, "avatar_img": "images/20250417_180333.jpg"},
+                #     ],
+                # }
+                # return all_mock_data.get(url, [])
 
             today = date.today()
             # Get users who played today and their max score
@@ -401,7 +403,8 @@ class MessagingService:
                                     break
                     
                     if rank:
-                        text = f"আজকে আপনি “ {game_name} “ গেমটি খেলেছেন এবং এখন পর্যন্ত আপনার সর্বোচ্চ স্কোর “ {max_score} “। আপনি লিডারবোর্ডে “ {rank} “ তম অবস্থানে রয়েছেন।"
+                        text = f"আজকে আপনি {game_name} গেমটি খেলেছেন এবং এখন পর্যন্ত আপনার সর্বোচ্চ স্কোর {max_score}। আপনি লিডারবোর্ডে {rank} তম অবস্থানে রয়েছেন।\
+                            \n\nখেলতে ক্লিক করুন- https://quizard.live/?qcid=246"
                         self.send_message(db, messenger_type, "resolve", text, user_id=user.id)
                         count += 1
                         
@@ -416,7 +419,8 @@ class MessagingService:
             for es in expiring:
                 sub = db.query(Subscription).filter(Subscription.id == es.subs_id).first()
                 sub_name = sub.name if sub else "সার্ভিস"
-                text = f"আগামী কাল আপনার “{sub_name}” সাবস্ক্রিপশনটি রিনিউ হবে। কোন রকম ব্যাঘাত ছাড়া নিয়মিত খেলে প্রাইজ পেতে অবশ্যই কাল বিকাশে যথেষ্ট ব্যালান্স রাখুন। ধন্যবাদ।"
+                text = f"আগামী কাল আপনার {sub_name} সাবস্ক্রিপশনটি রিনিউ হবে। কোন রকম ব্যাঘাত ছাড়া নিয়মিত খেলে প্রাইজ পেতে অবশ্যই কাল বিকাশে যথেষ্ট ব্যালান্স রাখুন। ধন্যবাদ।\
+                    \n\nখেলতে ক্লিক করুন- https://quizard.live/?qcid=246"
                 self.send_message(db, messenger_type, "resolve", text, user_id=es.user_id)
                 count += 1
 
@@ -431,7 +435,8 @@ class MessagingService:
             
             inactive_users = db.query(User).filter(User.id.in_(active_subs)).filter(User.id.notin_(played_recently)).all()
             for u in inactive_users:
-                text = "আমরা লক্ষ্ করেছি বিগত তিন দিন যাবত আপনি কোন গেম খেলছেন না। নিয়মিত ডেইলি প্রাইজ গুলো জিততে আজ থেকেই আবার খেলা শুরু করুন। আপনার জন্য শুভকামনা।"
+                text = "আমরা লক্ষ্ করেছি বিগত তিন দিন যাবত আপনি কোন গেম খেলছেন না। নিয়মিত ডেইলি প্রাইজ গুলো জিততে আজ থেকেই আবার খেলা শুরু করুন। আপনার জন্য শুভকামনা।\
+                    \n\nখেলতে ক্লিক করুন- https://quizard.live/?qcid=246"
                 self.send_message(db, messenger_type, "resolve", text, user_id=u.id)
                 count += 1
 
@@ -444,7 +449,7 @@ class MessagingService:
             
             to_remind = db.query(User).filter(User.id.in_(active_subs)).filter(User.id.notin_(played_today)).all()
             for u in to_remind:
-                text = "খেলার সময় চলছে। ডেইলি প্রাইজ পেতে এখনই খেলা শুরু করুন।"
+                text = "খেলার সময় চলছে। ডেইলি প্রাইজ পেতে এখনই খেলা শুরু করুন।\n\nখেলতে ক্লিক করুন- https://quizard.live/?qcid=246"
                 self.send_message(db, messenger_type, "resolve", text, user_id=u.id)
                 count += 1
 
@@ -484,7 +489,9 @@ class MessagingService:
             # Scenario 8: Daily refer sms to all.
             all_users = db.query(User).all()
             for u in all_users:
-                text = "আজই রেফার করে জিতে নিন পর পর তিন সপ্তাহে প্রাইজ জেতার সুযোগ!"
+                text = "আজই রেফার করে জিতে নিন পর পর তিন সপ্তাহে প্রাইজ জেতার সুযোগ!\
+                    \n\nQuizard-https://quizard.live/?page=referral\
+                    \n\nWordly-https://wordly.quizard.live/?page=referral"
                 self.send_message(db, messenger_type, "resolve", text, user_id=u.id)
                 count += 1
 
@@ -502,7 +509,8 @@ class MessagingService:
                 .group_by(PlayedQuiz.user_id).having(func.count(func.distinct(func.date(PlayedQuiz.created_at))) >= 3).all()
             
             for u in streak_users:
-                text = "আপনি সাপ্তাহিক উইনার হওয়ার তালিকায় রয়েছেন। অভিনন্দন! এভাবেই বেশি বেশি স্কোর করে যান। আপনার জন্য অপেক্ষা করছে সাপ্তাহিক পুরষ্কার !"
+                text = "আপনি সাপ্তাহিক উইনার হওয়ার তালিকায় রয়েছেন। অভিনন্দন! এভাবেই বেশি বেশি স্কোর করে যান। আপনার জন্য অপেক্ষা করছে সাপ্তাহিক পুরষ্কার!\
+                    \n\nখেলতে ক্লিক করুন- https://quizard.live/?qcid=246"
                 self.send_message(db, messenger_type, "resolve", text, user_id=u.user_id)
                 count += 1
 
@@ -532,17 +540,17 @@ class MessagingService:
             }
 
             # Mock data 
-            all_mock_data = {
-                "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=149": [
-                     {"User_Rank": 55, "msisdn": "1962401320", "score": 57, "time_taken": 136, "round_number": 1, "date": "2026-01-12", "event_id": 149, "category": None, "win": 1, "name": "", "username": "1962401320", "avatar_id": None, "avatar_img": ""}
-                ],
-                "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=153": [
-                    {"User_Rank": 1, "msisdn": "1628975383", "score": 59, "time_taken": 136, "round_number": 1, "date": "2026-01-07", "event_id": 153, "category": None, "win": 1, "name": "", "username": "1628975383", "avatar_id": None, "avatar_img": ""}
-                ],
-                "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=151": [
-                    {"User_Rank": 2, "msisdn": "1628975383", "score": 49, "time_taken": 156, "round_number": 1, "date": "2026-01-07", "event_id": 151, "category": None, "win": 1, "name": "Ullah", "username": "1628975383", "avatar_id": 1, "avatar_img": "images/20250417_180333.jpg"}
-                ],
-            }
+            # all_mock_data = {
+            #     "https://cms.quizard.live/api/leaderboard/?portal=15&event_id=149": [
+            #          {"User_Rank": 55, "msisdn": "1962401320", "score": 57, "time_taken": 136, "round_number": 1, "date": "2026-01-12", "event_id": 149, "category": None, "win": 1, "name": "", "username": "1962401320", "avatar_id": None, "avatar_img": ""}
+            #     ],
+            #     "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=153": [
+            #         {"User_Rank": 1, "msisdn": "1628975383", "score": 59, "time_taken": 136, "round_number": 1, "date": "2026-01-07", "event_id": 153, "category": None, "win": 1, "name": "", "username": "1628975383", "avatar_id": None, "avatar_img": ""}
+            #     ],
+            #     "https://cms.quizard.live/api/leaderboard/?portal=18&event_id=151": [
+            #         {"User_Rank": 2, "msisdn": "1628975383", "score": 49, "time_taken": 156, "round_number": 1, "date": "2026-01-07", "event_id": 151, "category": None, "win": 1, "name": "Ullah", "username": "1628975383", "avatar_id": 1, "avatar_img": "images/20250417_180333.jpg"}
+            #     ],
+            # }
 
             # Validating user helper (duplicated for safety)
             def get_user_by_msisdn(db: Session, msisdn: str) -> Optional[User]:
@@ -563,11 +571,11 @@ class MessagingService:
             
             for game_name, url in leaderboard_urls.items():
                 try:
-                    # response = requests.get(url, timeout=15)
-                    # response.raise_for_status()
-                    # leaderboard_data = response.json()
+                    response = requests.get(url, timeout=15)
+                    response.raise_for_status()
+                    leaderboard_data = response.json()
                     
-                    leaderboard_data = all_mock_data.get(url, [])
+                    # leaderboard_data = all_mock_data.get(url, [])
 
                     players = []
                     if "arcaderush.xyz" in url:
@@ -592,7 +600,8 @@ class MessagingService:
                         if rank > TARGET_RANK: # If rank is worse than 50
                             user = get_user_by_msisdn(db, player["username"])
                             if user:
-                                text = f"ইতিমধ্যে জেনেছেন “ {game_name} “ গেমের লিডারবোর্ডে আপনার অবস্থান “ {rank} “ তম। এই অবস্থানে আজকের ডেইলি প্রাইজ পাওয়া সম্ভব হবে না। দয়া করে আরেকটু চেষ্টা করুন। রাত ১১.৫৯ এর মধ্যে “ {TARGET_RANK} “ তম অবস্থানের ভিতরে থাকলেই পেয়ে যাবেন ডেইলি প্রাইজ।"
+                                text = f"ইতিমধ্যে জেনেছেন {game_name} গেমের লিডারবোর্ডে আপনার অবস্থান {rank} তম। এই অবস্থানে আজকের ডেইলি প্রাইজ পাওয়া সম্ভব হবে না। দয়া করে আরেকটু চেষ্টা করুন। রাত ১১.৫৯ এর মধ্যে {TARGET_RANK} তম অবস্থানের ভিতরে থাকলেই পেয়ে যাবেন ডেইলি প্রাইজ।\
+                                    \n\nখেলতে ক্লিক করুন- https://quizard.live/?qcid=246"
                                 self.send_message(db, messenger_type, "resolve", text, user_id=user.id)
                                 count += 1
 
