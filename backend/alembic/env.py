@@ -1,7 +1,7 @@
 
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
+from sqlalchemy import engine_from_config, create_engine
 from sqlalchemy import pool
 
 from alembic import context
@@ -9,7 +9,7 @@ from alembic import context
 # Import Base and Models
 from app.database.base import Base
 from app.models import *  # noqa
-# from app.core.config import settings
+from app.core.config import settings
 
 
 # this is the Alembic Config object, which provides
@@ -27,7 +27,7 @@ target_metadata = Base.metadata
 
 # Set Config URL
 # config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-config.set_main_option("sqlalchemy.url", "mysql+pymysql://root:password@localhost:3306/purplepatch-messenger")
+# config.set_main_option("sqlalchemy.url", "mysql+pymysql://admin:D3xt3r%260013@103.174.50.155:3306/notification_service_db")
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -41,7 +41,8 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    # url = config.get_main_option("sqlalchemy.url")
+    url = settings.DATABASE_URL
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -60,9 +61,13 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
+    # connectable = engine_from_config(
+    #     config.get_section(config.config_ini_section),
+    #     prefix="sqlalchemy.",
+    #     poolclass=pool.NullPool,
+    # )
+    connectable = create_engine(
+        settings.DATABASE_URL,
         poolclass=pool.NullPool,
     )
 
