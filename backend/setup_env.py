@@ -1,17 +1,21 @@
 
-content = """PROJECT_NAME="Notification Service"
-MYSQL_USER=root
-MYSQL_PASSWORD=password
-MYSQL_SERVER=localhost
-MYSQL_PORT=3306
-MYSQL_DB=purplepatch-messenger
+content = """PROJECT_NAME=Notification Service
+API_V1_STR=/api/v1
+BACKEND_CORS_ORIGINS=["http://localhost:3000", "http://192.168.5.12:3000", "https://notification.arcaderush.xyz/"]
 
-DATABASE_URL=mysql+pymysql://root:password@localhost:3306/purplepatch-messenger
+MYSQL_USER=admin
+MYSQL_PASSWORD=D3xt3r&0013
+MYSQL_SERVER=103.174.50.155
+MYSQL_PORT=3306
+MYSQL_DB=notification_service_db
+
+DATABASE_URL=mysql+pymysql://admin:D3xt3r%260013@103.174.50.155:3306/notification_service_db
 
 CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/0
 
-BACKEND_CORS_ORIGINS=["http://localhost:3000", "http://localhost:8000"]
+TELEGRAM_BOT_TOKEN=8552838793:AAEeWSqKRr8EwkKrEE_lTsT9Wx2AMY3kMzE
+TELEGRAM_CHANNEL_ID=@PP_test123
 """
 with open('.env', 'w') as f:
     f.write(content.strip())
