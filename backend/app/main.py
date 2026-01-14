@@ -14,22 +14,16 @@ exception_handler = ExceptionHandler(logger)
 app = FastAPI()
 
 # New CORS Middleware
-origins = [
-    "http://localhost:3000", # Next.js development server default
-    "http://localhost:3001", # Next.js development server port in docker
-    "http://localhost:3002", # Next.js development server alternate port
-    "http://localhost:5173", # Vite development server
-    "http://192.168.5.12:3000",
-    # You can add other origins here for production or other environments
-]
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Register custom exception handlers for consistent error responses
 @app.exception_handler(BaseAppException)
