@@ -2,7 +2,7 @@
     "info": {
         "_postman_id": "7a3b1c2e-4d5f-6a7b-8c9d-0e1f2a3b4c5d",
         "name": "Notification Service - Webhooks (Name Based)",
-        "description": "Collection for synchronizing data from external services using names/usernames instead of internal IDs.",
+        "description": "Collection for synchronizing data from external services using names/usernames instead of internal IDs. Schema details included in request bodies.",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "item": [
@@ -18,7 +18,7 @@
                 ],
                 "body": {
                     "mode": "raw",
-                    "raw": "{\n    \"username\": \"test_user\",\n    \"email\": \"test@example.com\",\n    \"full_name\": \"Test User\",\n    \"phone_number\": \"+1234567890\"\n}"
+                    "raw": "{\n    // (Mandatory) username: string\n    \"username\": \"test_user_123\",\n\n    // (Optional) email: string (must be a valid email format)\n    \"email\": \"test.user@example.com\",\n\n    // (Optional) full_name: string\n    \"full_name\": \"Test User Full Name\",\n\n    // (Optional) phone_number: string\n    \"phone_number\": \"+1234567890\",\n\n    // (Optional) quizard: boolean (defaults to false)\n    \"quizard\": false,\n\n    // (Optional) wordly: boolean (defaults to false)\n    \"wordly\": false,\n\n    // (Optional) arcaderush: boolean (defaults to false)\n    \"arcaderush\": false\n}"
                 },
                 "url": {
                     "raw": "{{base_url}}/api/v1/webhook/sync-user",
@@ -32,7 +32,7 @@
                         "sync-user"
                     ]
                 },
-                "description": "Syncs user data using username and email."
+                "description": "Syncs user data (create or update). Requires a unique username. Email is used as a secondary lookup key if provided."
             },
             "response": []
         },
@@ -48,7 +48,7 @@
                 ],
                 "body": {
                     "mode": "raw",
-                    "raw": "{\n    \"name\": \"Saap Ludu\",\n    \"type\": \"PREMIUM\",\n    \"time\": \"MONTHLY\",\n    \"platform\": \"quizard\",\n    \"amount\": 10,\n    \"offer\": \"50% discount for new user\",\n    \"prize\": \"macBook\",\n    \"remark\": [\"High priority\", \"All channels\"]\n}"
+                    "raw": "{\n    // (Mandatory) name: string\n    \"name\": \"Premium Plan\",\n\n    // (Optional) type: string - Enum: \"FREE\", \"PREMIUM\", \"VIP\"\n    \"type\": \"PREMIUM\",\n\n    // (Optional) time: string - Enum: \"DAILY\", \"WEEKLY\", \"MONTHLY\", \"YEARLY\"\n    \"time\": \"MONTHLY\",\n\n    // (Optional) platform: string - Enum: \"quizard\", \"wordly\", \"arcaderush\"\n    \"platform\": \"quizard\",\n\n    // (Optional) amount: integer\n    \"amount\": 15,\n\n    // (Optional) offer: string\n    \"offer\": \"New year 50% discount\",\n\n    // (Optional) prize: string\n    \"prize\": \"Amazon Gift Card\",\n\n    // (Optional) remark: array of strings\n    \"remark\": [\"High priority\", \"All channels\"],\n\n    // (Optional) link: string (URL)\n    \"link\": \"https://example.com/subscription/premium\",\n\n    // (Optional) start_date: string (ISO 8601 format)\n    \"start_date\": \"2024-01-01T00:00:00Z\",\n\n    // (Optional) end_date: string (ISO 8601 format)\n    \"end_date\": \"2025-01-01T00:00:00Z\"\n}"
                 },
                 "url": {
                     "raw": "{{base_url}}/api/v1/webhook/sync-subscription",
@@ -62,7 +62,7 @@
                         "sync-subscription"
                     ]
                 },
-                "description": "Syncs subscription metadata by name."
+                "description": "Syncs subscription metadata by name (create or update)."
             },
             "response": []
         },
@@ -78,7 +78,7 @@
                 ],
                 "body": {
                     "mode": "raw",
-                    "raw": "{\n    \"username\": \"test_user\",\n    \"subs\": \"Saap Ludu\",\n    \"score\": 10,\n    \"time\": 120\n}"
+                    "raw": "{\n    // (Mandatory) username: string (must exist in the system)\n    \"username\": \"test_user_123\",\n\n    // (Mandatory) subs: string (subscription name, must exist)\n    \"subs\": \"Premium Plan\",\n\n    // (Optional) score: integer (defaults to 0)\n    \"score\": 95,\n\n    // (Optional) time: integer (time taken in seconds)\n    \"time\": 120\n}"
                 },
                 "url": {
                     "raw": "{{base_url}}/api/v1/webhook/record-quiz",
@@ -92,7 +92,7 @@
                         "record-quiz"
                     ]
                 },
-                "description": "Records a quiz game result using username and subscription name."
+                "description": "Records a quiz game result for a specific user and subscription."
             },
             "response": []
         },
@@ -108,7 +108,7 @@
                 ],
                 "body": {
                     "mode": "raw",
-                    "raw": "{\n    \"username\": \"test_user\",\n    \"subs\": \"Saap Ludu\",\n    \"start_date\": \"2024-12-28T00:00:00\",\n    \"end_date\": \"2025-01-28T00:00:00\"\n}"
+                    "raw": "{\n    // (Mandatory) username: string (must exist)\n    \"username\": \"test_user_123\",\n\n    // (Mandatory) subs: string (subscription name, must exist)\n    \"subs\": \"Premium Plan\",\n\n    // (Optional) start_date: string (ISO 8601 format)\n    \"start_date\": \"2024-12-28T00:00:00Z\",\n\n    // (Optional) end_date: string (ISO 8601 format)\n    \"end_date\": \"2025-01-28T00:00:00Z\"\n}"
                 },
                 "url": {
                     "raw": "{{base_url}}/api/v1/webhook/link-user-subscription",
@@ -122,7 +122,7 @@
                         "link-user-subscription"
                     ]
                 },
-                "description": "Links a user to a subscription using username and subscription name."
+                "description": "Links a user to a subscription. Creates the link or updates dates if it already exists."
             },
             "response": []
         },
@@ -138,7 +138,7 @@
                 ],
                 "body": {
                     "mode": "raw",
-                    "raw": "{\n    \"username\": \"test_user\"\n}"
+                    "raw": "{\n    // (Mandatory) username: string\n    \"username\": \"test_user_123\"\n}"
                 },
                 "url": {
                     "raw": "{{base_url}}/api/v1/webhook/check-user",
@@ -168,7 +168,7 @@
                 ],
                 "body": {
                     "mode": "raw",
-                    "raw": "{\n    \"username\": \"test_user\",\n    \"platform\": \"quizard\"\n}"
+                    "raw": "{\n    // (Mandatory) username: string (must exist)\n    \"username\": \"test_user_123\",\n\n    // (Mandatory) platform: string - Enum: \"quizard\", \"wordly\", \"arcaderush\"\n    \"platform\": \"quizard\"\n}"
                 },
                 "url": {
                     "raw": "{{base_url}}/api/v1/webhook/register-platform",
@@ -182,7 +182,7 @@
                         "register-platform"
                     ]
                 },
-                "description": "Registers an existing user to a specific platform."
+                "description": "Registers an existing user to a specific platform (sets the platform flag to true)."
             },
             "response": []
         }
@@ -190,7 +190,7 @@
     "variable": [
         {
             "key": "base_url",
-            "value": "http://192.168.5.12:8000",
+            "value": "http://127.0.0.1:8000",
             "type": "string"
         }
     ]

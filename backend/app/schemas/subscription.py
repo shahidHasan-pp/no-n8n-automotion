@@ -1,5 +1,6 @@
 
 from typing import List, Optional, Any
+import json
 from datetime import datetime
 from pydantic import BaseModel, validator
 from app.models.enums import QuizType, SubscriptionType, SubscriptionLength, PlatformType
@@ -20,10 +21,20 @@ class SubscriptionBase(BaseModel):
     end_date: Optional[datetime] = None
 
     @validator('remark', pre=True)
-    def default_remark_if_none(cls, v):
+    def normalize_remark(cls, v):
+        # Ensure remark is always a list. Accepts list, dict, or JSON string.
         if v is None:
             return []
-        return v
+        if isinstance(v, str):
+            try:
+                v = json.loads(v)
+            except Exception:
+                return []
+        if isinstance(v, dict):
+            return [v]
+        if isinstance(v, list):
+            return v
+        return []
 
     @validator('type', pre=True)
     def upper_case_type(cls, v):
