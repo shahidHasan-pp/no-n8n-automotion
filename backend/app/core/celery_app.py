@@ -10,12 +10,16 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="Asia/Dhaka",
     enable_utc=True,
-    include=["app.tasks.celery", "app.tasks.scenario"],
+    include=["app.tasks.celery", "app.tasks.scenario", "app.tasks.sync_tasks"],
 )
 
 from celery.schedules import crontab
 
 celery_app.conf.beat_schedule = {
+    "sync-external-data-every-30-mins": {
+        "task": "sync_external_data",
+        "schedule": crontab(minute="*/30"), # Every 30 minutes
+    },
     "unsubscribed-reminder-daily": {
         "task": "run_messaging_scenario",
         "schedule": crontab(hour=11, minute=0), # 11 AM
