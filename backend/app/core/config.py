@@ -28,13 +28,15 @@ class Settings(BaseSettings):
     MYSQL_SERVER: str = "103.174.50.155"
     MYSQL_PORT: str = "3306"
     MYSQL_DB: str = "notification_service_db"
-    DATABASE_URL: str = "mysql+pymysql://admin:D3xt3r%260013@103.174.50.155:3306/notification_service_db"
+    DATABASE_URL: str = "mysql+pymysql://root:password@localhost:3306/purplepatch_messenger"
+    #"mysql+pymysql://admin:D3xt3r%260013@103.174.50.155:3306/notification_service_db"
 
     @validator("DATABASE_URL", pre=True)
     def assemble_db_connection(cls, v: str, values: dict) -> str:
         if isinstance(v, str) and v:
             return v
-        return f"mysql+pymysql://{values.get('MYSQL_USER')}:{values.get('MYSQL_PASSWORD')}@{values.get('MYSQL_SERVER')}:{values.get('MYSQL_PORT')}/{values.get('MYSQL_DB')}"
+        return DATABASE_URL
+        #return f"mysql+pymysql://{values.get('MYSQL_USER')}:{values.get('MYSQL_PASSWORD')}@{values.get('MYSQL_SERVER')}:{values.get('MYSQL_PORT')}/{values.get('MYSQL_DB')}"
 
     # Celery
     CELERY_BROKER_URL: str = "redis://redis:6379/0"

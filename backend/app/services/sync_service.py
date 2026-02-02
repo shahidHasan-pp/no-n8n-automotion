@@ -24,22 +24,16 @@ class SyncService:
         except KeyError:
             logger.warning(f"Invalid platform name '{platform_name}' found in payload. Skipping.")
             return None
-
-    def formatDatetime(self, datetime_str: str) -> Optional[datetime]:
-        """
-        Parses a datetime string from external APIs, handling inconsistent formats.
-        It tries to parse formats with 'T' first, then with a space.
-        Returns a datetime object if successful, None otherwise.
-        """
+    
+    def formatDatetime(self, datetime_str: str) -> Optional[str]:
         if not datetime_str:
             return None
-        
-        parsed_dt = None
         try:
-            parsed_dt = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S")
+            dt = datetime.fromisoformat(datetime_str)
+            return dt.strftime("%Y-%m-%d %H:%M:%S")  # no 'T'
         except ValueError:
-            logger.warning(f"Could not parse datetime string '{datetime_str}' with known formats.")
-        return parsed_dt
+            logger.warning(f"Could not parse datetime string '{datetime_str}'")
+            return None
 
     def _process_logins(self, db: Session, login_data: dict):
         logger.info("Processing logins...")
