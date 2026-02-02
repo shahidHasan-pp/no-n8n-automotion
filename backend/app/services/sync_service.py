@@ -5,11 +5,17 @@ from app import crud, schemas, models
 from app.utils.logger import get_logger
 from app.models.enums import PlatformType
 from datetime import datetime # Added datetime import
+from typing import Optional
 
 logger = get_logger("sync_service")
 
-# This would be in a config file in a real application
-EXTERNAL_API_URL = "http://quizard.com/getSyncUpdate" # Updated URL
+# This should ideally be in app/core/config.py and loaded from environment variables
+# For now, hardcoding the list of external API URLs
+EXTERNAL_API_URLS = [
+    #"http://quizard.com/getSyncUpdate",
+    "http://127.0.0.1:8000/api/getSyncUpdate/",
+    "https://arcaderush.xyz/api/manual/last30minutes"
+]
 
 class SyncService:
     def _get_platform_enum(self, platform_name: str) -> PlatformType:
@@ -18,6 +24,22 @@ class SyncService:
         except KeyError:
             logger.warning(f"Invalid platform name '{platform_name}' found in payload. Skipping.")
             return None
+
+    def formatDatetime(self, datetime_str: str) -> Optional[datetime]:
+        """
+        Parses a datetime string from external APIs, handling inconsistent formats.
+        It tries to parse formats with 'T' first, then with a space.
+        Returns a datetime object if successful, None otherwise.
+        """
+        if not datetime_str:
+            return None
+        
+        parsed_dt = None
+        try:
+            parsed_dt = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            logger.warning(f"Could not parse datetime string '{datetime_str}' with known formats.")
+        return parsed_dt
 
     def _process_logins(self, db: Session, login_data: dict):
         logger.info("Processing logins...")
@@ -73,11 +95,9 @@ class SyncService:
                     continue
 
                 try:
-                    # Parse dates
-                    start_date_str = sub_data.get("start_date")
-                    end_date_str = sub_data.get("end_date")
-                    start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S") if start_date_str else None
-                    end_date = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S") if end_date_str else None
+                    # Parse dates using the new helper function
+                    start_date = self.formatDatetime(sub_data.get("start_date"))
+                    end_date = self.formatDatetime(sub_data.get("end_date"))
 
                     # 1. Sync Subscription
                     subscription = crud.subscription.get_by_name(db, name=sub_name)
@@ -140,7 +160,12 @@ class SyncService:
                     continue
                 
                 try:
-                    played_time = datetime.strptime(played_time_str, "%Y-%m-%d %H:%M:%S")
+                    played_time = self.formatDatetime(played_time_str) # Use the new helper function
+                    
+                    if not played_time: # Ensure played_time was successfully parsed
+                        logger.warning(f"Played time not available or could not be parsed for record: {played_item}. Skipping record.")
+                        continue
+
 
                     user = crud.user.get_by_username(db, username=username)
                     subscription = crud.subscription.get_by_name(db, name=sub_name)
@@ -169,29 +194,48 @@ class SyncService:
         logger.info("Finished processing played quizzes.")
 
     def sync_from_updates_api(self, db: Session):
-        logger.info(f"Starting synchronization from external API: {EXTERNAL_API_URL}")
-        try:
-            response = requests.get(EXTERNAL_API_URL, timeout=30)
-            response.raise_for_status()
-            payload = response.json()
-            logger.info("Successfully fetched data from external API.")
+        logger.info(f"Starting synchronization from external APIs: {EXTERNAL_API_URLS}")
+        
+        aggregated_payload = {"login": {}, "subscription": {}, "played": {}}
 
-            if "login" in payload:
-                self._process_logins(db, payload["login"])
-            
-            if "subscription" in payload:
-                self._process_subscriptions(db, payload["subscription"])
+        for api_url in EXTERNAL_API_URLS:
+            try:
+                response = requests.get(api_url, timeout=30)
+                response.raise_for_status()
+                payload = response.json()
+                logger.info(f"Successfully fetched data from {api_url}.")
 
-            if "played" in payload:
-                self._process_played(db, payload["played"])
+                for category in ["login", "subscription", "played"]:
+                    if category in payload:
+                        for platform_name, data_list in payload[category].items():
+                            if platform_name not in aggregated_payload[category]:
+                                aggregated_payload[category][platform_name] = []
+                            aggregated_payload[category][platform_name].extend(data_list)
 
-            logger.info("Synchronization process completed successfully.")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Failed to fetch data from external API {api_url}: {e}")
+                # Do not rollback entire transaction here, try next API
+            except Exception as e:
+                logger.error(f"An unexpected error occurred while fetching from {api_url}: {e}")
+                # Do not rollback entire transaction here, try next API
+        
+        # Only process if any data was successfully aggregated
+        if any(aggregated_payload[cat] for cat in aggregated_payload):
+            try:
+                if "login" in aggregated_payload:
+                    self._process_logins(db, aggregated_payload["login"])
+                
+                if "subscription" in aggregated_payload:
+                    self._process_subscriptions(db, aggregated_payload["subscription"])
 
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to fetch data from external API: {e}")
-            db.rollback() # Rollback in case of request exception
-        except Exception as e:
-            logger.error(f"An unexpected error occurred during synchronization: {e}")
-            db.rollback()
+                if "played" in aggregated_payload:
+                    self._process_played(db, aggregated_payload["played"])
+
+                logger.info("Synchronization process completed successfully for all aggregated data.")
+            except Exception as e:
+                logger.error(f"An error occurred during processing aggregated data: {e}")
+                db.rollback() # Rollback if processing of aggregated data fails
+        else:
+            logger.info("No data fetched from any external API. Skipping processing.")
 
 sync_service = SyncService()

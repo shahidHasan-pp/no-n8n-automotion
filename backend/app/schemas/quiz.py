@@ -25,6 +25,7 @@ class PlayedQuizBase(BaseModel):
     time: Optional[int] = None
     user_id: int
     subs_id: Optional[int] = None
+    created_at: Optional[datetime] = None
 
 class PlayedQuizCreate(PlayedQuizBase):
     pass
