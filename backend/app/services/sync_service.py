@@ -1,13 +1,15 @@
+
 import requests
 from sqlalchemy.orm import Session
 from app import crud, schemas, models
 from app.utils.logger import get_logger
 from app.models.enums import PlatformType
+from datetime import datetime # Added datetime import
 
-logger = get_logger(__name__)
+logger = get_logger("sync_service")
 
 # This would be in a config file in a real application
-EXTERNAL_API_URL = "https://webhook.site/e05b4c7f-4f26-4ce2-9709-a62e4ec82c37" # A mock URL that returns the specified payload structure
+EXTERNAL_API_URL = "http://quizard.com/getSyncUpdate" # Updated URL
 
 class SyncService:
     def _get_platform_enum(self, platform_name: str) -> PlatformType:
@@ -71,6 +73,12 @@ class SyncService:
                     continue
 
                 try:
+                    # Parse dates
+                    start_date_str = sub_data.get("start_date")
+                    end_date_str = sub_data.get("end_date")
+                    start_date = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S") if start_date_str else None
+                    end_date = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S") if end_date_str else None
+
                     # 1. Sync Subscription
                     subscription = crud.subscription.get_by_name(db, name=sub_name)
                     if not subscription:
@@ -89,14 +97,25 @@ class SyncService:
                         models.UserSubscribed.subs_id == subscription.id
                     ).first()
 
-                    if not existing_link:
-                        link_in = schemas.UserSubscribedCreate(user_id=user.id, subs_id=subscription.id)
-                        crud.user_subscribed.create(db, obj_in=link_in)
-                        logger.info(f"Linked user {username} to subscription {sub_name}")
+                    if existing_link:
+                        if start_date:
+                            existing_link.start_date = start_date
+                        if end_date:
+                            existing_link.end_date = end_date
+                        db.add(existing_link) # Mark as modified
+                        db.commit() # Commit changes to existing link
+                        logger.debug(f"Updated link dates for user {username} and subscription {sub_name}")
                     else:
-                        logger.debug(f"User {username} is already linked to subscription {sub_name}")
+                        link_in = schemas.UserSubscribedCreate(
+                            user_id=user.id,
+                            subs_id=subscription.id,
+                            start_date=start_date,
+                            end_date=end_date
+                        )
+                        crud.user_subscribed.create(db, obj_in=link_in)
+                        db.commit() # Commit changes for new link
+                        logger.info(f"Linked user {username} to subscription {sub_name} with dates {start_date}-{end_date}")
 
-                    db.commit()
                 except Exception as e:
                     logger.error(f"Error processing subscription for user '{username}' and sub '{sub_name}': {e}")
                     db.rollback()
@@ -114,12 +133,15 @@ class SyncService:
                 sub_name = played_item.get("service_type")
                 score = played_item.get("right_cout") # Note the field name 'right_cout'
                 time_taken = played_item.get("time_taken")
+                played_time_str = played_item.get("time") # New field
 
-                if not all([username, sub_name, score is not None, time_taken is not None]):
+                if not all([username, sub_name, score is not None, time_taken is not None, played_time_str]):
                     logger.warning(f"Skipping incomplete played record: {played_item}")
                     continue
                 
                 try:
+                    played_time = datetime.strptime(played_time_str, "%Y-%m-%d %H:%M:%S")
+
                     user = crud.user.get_by_username(db, username=username)
                     subscription = crud.subscription.get_by_name(db, name=sub_name)
 
@@ -134,11 +156,12 @@ class SyncService:
                         user_id=user.id,
                         subs_id=subscription.id,
                         score=score,
-                        time=time_taken
+                        time=time_taken,
+                        created_at=played_time # Use the 'time' field for created_at
                     )
                     crud.quiz.create(db, obj_in=quiz_in)
-                    logger.info(f"Recorded quiz for user {username}, subscription {sub_name}, score: {score}")
-                    db.commit()
+                    db.commit() # Commit for new quiz record
+                    logger.info(f"Recorded quiz for user {username}, subscription {sub_name}, score: {score} at {played_time}")
 
                 except Exception as e:
                     logger.error(f"Error recording quiz for user '{username}' and sub '{sub_name}': {e}")
@@ -166,6 +189,7 @@ class SyncService:
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to fetch data from external API: {e}")
+            db.rollback() # Rollback in case of request exception
         except Exception as e:
             logger.error(f"An unexpected error occurred during synchronization: {e}")
             db.rollback()
