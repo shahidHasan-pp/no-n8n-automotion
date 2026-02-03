@@ -24,15 +24,65 @@ class SyncService:
         except KeyError:
             logger.warning(f"Invalid platform name '{platform_name}' found in payload. Skipping.")
             return None
-    
+
     def formatDatetime(self, datetime_str: str) -> Optional[str]:
         if not datetime_str:
             return None
+        # Normalize datetime string to use 'T' separator
+        datetime_str = str(datetime_str).replace(" ", "T")
         try:
             dt = datetime.fromisoformat(datetime_str)
-            return dt.strftime("%Y-%m-%d %H:%M:%S")  # no 'T'
-        except ValueError:
+            return dt.strftime("%Y-%m-%d %H:%M:%S")
+        except (ValueError, TypeError):
             logger.warning(f"Could not parse datetime string '{datetime_str}'")
+            return None
+
+    def _get_or_create_user(self, db: Session, username: str, platform_enum: PlatformType, phone: Optional[str] = None) -> Optional[models.User]:
+        """Gets a user by username or creates a new one if not found."""
+        if not username:
+            logger.warning("Attempted to get or create a user with an empty username.")
+            return None
+        
+        user = crud.user.get_by_username(db, username=username)
+        if user:
+            return user
+        
+        try:
+            logger.info(f"User '{username}' not found. Creating new user.")
+            user_in = schemas.UserCreate(username=username, phone_number=phone)
+            user = crud.user.create(db, obj_in=user_in)
+            setattr(user, platform_enum.value, True)
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            logger.info(f"Successfully created new user '{username}' from sync.")
+            return user
+        except Exception as e:
+            logger.error(f"Error creating user '{username}' from sync: {e}")
+            db.rollback()
+            return None
+
+    def _get_or_create_subscription(self, db: Session, sub_name: str, platform_enum: PlatformType) -> Optional[models.Subscription]:
+        """Gets a subscription by name or creates a new one if not found."""
+        if not sub_name:
+            logger.warning("Attempted to get or create a subscription with an empty name.")
+            return None
+            
+        subscription = crud.subscription.get_by_name(db, name=sub_name)
+        if subscription:
+            return subscription
+
+        try:
+            logger.info(f"Subscription '{sub_name}' not found. Creating new subscription.")
+            sub_in = schemas.SubscriptionCreate(name=sub_name, platform=platform_enum)
+            subscription = crud.subscription.create(db, obj_in=sub_in)
+            db.commit()
+            db.refresh(subscription)
+            logger.info(f"Created new subscription '{sub_name}' for platform {platform_enum.name}.")
+            return subscription
+        except Exception as e:
+            logger.error(f"Error creating subscription '{sub_name}' from sync: {e}")
+            db.rollback()
             return None
 
     def _process_logins(self, db: Session, login_data: dict):
@@ -45,31 +95,25 @@ class SyncService:
             for user_data in users:
                 username = user_data.get("username")
                 if not username:
+                    logger.warning("Skipping login record with empty username.")
                     continue
 
+                user = crud.user.get_by_username(db, username=username)
+                if user:
+                    logger.debug(f"User '{username}' already exists, skipping creation.")
+                    continue
+                
                 try:
-                    # 1. Check if user exists
-                    user = crud.user.get_by_username(db, username=username)
+                    # Create new user if it doesn't exist
                     user_in = schemas.UserCreate(
                         username=username,
                         phone_number=user_data.get("phone"),
                     )
-                    
-                    if user:
-                        # 2. Update existing user
-                        update_data = user_in.dict(exclude_unset=True)
-                        crud.user.update(db, db_obj=user, obj_in=update_data)
-                        logger.debug(f"Updated user: {username}")
-                    else:
-                        # 3. Create new user
-                        user = crud.user.create(db, obj_in=user_in)
-                        logger.info(f"Created new user: {username}")
-
-                    # 4. Set platform registration flag
-                    setattr(user, platform_enum.value, True)
-                    db.add(user)
+                    new_user = crud.user.create(db, obj_in=user_in)
+                    setattr(new_user, platform_enum.value, True)
+                    db.add(new_user)
                     db.commit()
-
+                    logger.info(f"Created new user via login sync: {username}")
                 except Exception as e:
                     logger.error(f"Error processing login for user '{username}': {e}")
                     db.rollback()
@@ -86,25 +130,22 @@ class SyncService:
                 username = sub_data.get("username")
                 sub_name = sub_data.get("service_type")
                 if not (username and sub_name):
+                    logger.warning(f"Skipping subscription record with missing username or service_type: {sub_data}")
                     continue
 
                 try:
-                    # Parse dates using the new helper function
+                    user = self._get_or_create_user(db, username, platform_enum, phone=sub_data.get("phone"))
+                    if not user:
+                        logger.warning(f"Could not get or create user '{username}', skipping subscription link.")
+                        continue
+
+                    subscription = self._get_or_create_subscription(db, sub_name, platform_enum)
+                    if not subscription:
+                        logger.warning(f"Could not get or create subscription '{sub_name}', skipping link for user '{username}'.")
+                        continue
+
                     start_date = self.formatDatetime(sub_data.get("start_date"))
                     end_date = self.formatDatetime(sub_data.get("end_date"))
-
-                    # 1. Sync Subscription
-                    subscription = crud.subscription.get_by_name(db, name=sub_name)
-                    if not subscription:
-                        sub_in = schemas.SubscriptionCreate(name=sub_name, platform=platform_enum)
-                        subscription = crud.subscription.create(db, obj_in=sub_in)
-                        logger.info(f"Created new subscription: {sub_name} for platform {platform_name}")
-
-                    # 2. Link User to Subscription
-                    user = crud.user.get_by_username(db, username=username)
-                    if not user:
-                        logger.warning(f"Cannot link subscription: User '{username}' not found.")
-                        continue
                     
                     existing_link = db.query(models.UserSubscribed).filter(
                         models.UserSubscribed.user_id == user.id,
@@ -112,24 +153,19 @@ class SyncService:
                     ).first()
 
                     if existing_link:
-                        if start_date:
-                            existing_link.start_date = start_date
-                        if end_date:
-                            existing_link.end_date = end_date
-                        db.add(existing_link) # Mark as modified
-                        db.commit() # Commit changes to existing link
-                        logger.debug(f"Updated link dates for user {username} and subscription {sub_name}")
+                        if start_date: existing_link.start_date = start_date
+                        if end_date: existing_link.end_date = end_date
+                        db.add(existing_link)
+                        logger.debug(f"Updated subscription link for user '{username}' to '{sub_name}'.")
                     else:
                         link_in = schemas.UserSubscribedCreate(
-                            user_id=user.id,
-                            subs_id=subscription.id,
-                            start_date=start_date,
-                            end_date=end_date
+                            user_id=user.id, subs_id=subscription.id,
+                            start_date=start_date, end_date=end_date
                         )
                         crud.user_subscribed.create(db, obj_in=link_in)
-                        db.commit() # Commit changes for new link
-                        logger.info(f"Linked user {username} to subscription {sub_name} with dates {start_date}-{end_date}")
+                        logger.info(f"Linked user '{username}' to subscription '{sub_name}'.")
 
+                    db.commit()
                 except Exception as e:
                     logger.error(f"Error processing subscription for user '{username}' and sub '{sub_name}': {e}")
                     db.rollback()
@@ -145,42 +181,37 @@ class SyncService:
             for played_item in played_list:
                 username = played_item.get("username")
                 sub_name = played_item.get("service_type")
-                score = played_item.get("right_cout") # Note the field name 'right_cout'
+                score = played_item.get("right_cout")
                 time_taken = played_item.get("time_taken")
-                played_time_str = played_item.get("time") # New field
+                played_time_str = played_item.get("time")
 
                 if not all([username, sub_name, score is not None, time_taken is not None, played_time_str]):
                     logger.warning(f"Skipping incomplete played record: {played_item}")
                     continue
                 
                 try:
-                    played_time = self.formatDatetime(played_time_str) # Use the new helper function
-                    
-                    if not played_time: # Ensure played_time was successfully parsed
-                        logger.warning(f"Played time not available or could not be parsed for record: {played_item}. Skipping record.")
-                        continue
-
-
-                    user = crud.user.get_by_username(db, username=username)
-                    subscription = crud.subscription.get_by_name(db, name=sub_name)
-
+                    user = self._get_or_create_user(db, username, platform_enum)
                     if not user:
-                        logger.warning(f"Cannot record quiz: User '{username}' not found.")
+                        logger.warning(f"Could not find or create user '{username}', skipping played record.")
                         continue
+                        
+                    subscription = self._get_or_create_subscription(db, sub_name, platform_enum)
                     if not subscription:
-                        logger.warning(f"Cannot record quiz: Subscription '{sub_name}' not found.")
+                        logger.warning(f"Could not find or create subscription '{sub_name}', skipping played record for user '{username}'.")
+                        continue
+
+                    played_time = self.formatDatetime(played_time_str)
+                    if not played_time:
+                        logger.warning(f"Could not parse played time for record: {played_item}. Skipping.")
                         continue
                         
                     quiz_in = schemas.PlayedQuizCreate(
-                        user_id=user.id,
-                        subs_id=subscription.id,
-                        score=score,
-                        time=time_taken,
-                        created_at=played_time # Use the 'time' field for created_at
+                        user_id=user.id, subs_id=subscription.id,
+                        score=score, time=time_taken, created_at=played_time
                     )
                     crud.quiz.create(db, obj_in=quiz_in)
-                    db.commit() # Commit for new quiz record
-                    logger.info(f"Recorded quiz for user {username}, subscription {sub_name}, score: {score} at {played_time}")
+                    db.commit()
+                    logger.info(f"Recorded quiz for user '{username}', sub '{sub_name}', score: {score}")
 
                 except Exception as e:
                     logger.error(f"Error recording quiz for user '{username}' and sub '{sub_name}': {e}")

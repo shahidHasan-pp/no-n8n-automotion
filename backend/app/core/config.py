@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     MYSQL_SERVER: str = "103.174.50.155"
     MYSQL_PORT: str = "3306"
     MYSQL_DB: str = "notification_service_db"
-    DATABASE_URL: str = "mysql+pymysql://root:password@localhost:3306/purplepatch_messenger"
+    DATABASE_URL: str = "mysql+pymysql://root:password@localhost:3306/purplepatch-messenger"
     #"mysql+pymysql://admin:D3xt3r%260013@103.174.50.155:3306/notification_service_db"
 
     @validator("DATABASE_URL", pre=True)
