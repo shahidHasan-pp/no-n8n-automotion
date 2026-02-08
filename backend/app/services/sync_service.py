@@ -12,8 +12,8 @@ logger = get_logger("sync_service")
 # This should ideally be in app/core/config.py and loaded from environment variables
 # For now, hardcoding the list of external API URLs
 EXTERNAL_API_URLS = [
-    #"http://quizard.com/getSyncUpdate",
-    "http://127.0.0.1:8000/api/getSyncUpdate/",
+    "http://quizard.com/getSyncUpdate",
+    #"http://127.0.0.1:8000/api/getSyncUpdate/",
     "https://arcaderush.xyz/api/manual/last30minutes"
 ]
 
